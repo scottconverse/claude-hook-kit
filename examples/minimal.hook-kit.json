@@ -17,6 +17,11 @@
     "explanation": "The live database is read-only for me; go through the tested path."
   },
 
+  "double-check": {
+    "quote": "Scott, Oct 14 2026: \"Check everything twice, read everything, do not skim, check the code.\"",
+    "label": "my project"
+  },
+
   "wake": {
     "minutes": 20,
     "runsDir": ".claude/runs",

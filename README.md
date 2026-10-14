@@ -1,6 +1,6 @@
 # claude-hook-kit
 
-Six Claude Code hooks, made per-project.
+Seven Claude Code hooks, made per-project: six ported from the hooks Scott ran before the kit, plus `double-check` (added Oct 14, 2026).
 
 The hooks Scott runs today live in `~/.claude/settings.json`, so they fire in **every** project.
 Several of them are wired to one project: the rules injector reads one fixed `RULES.md`, the
@@ -31,6 +31,7 @@ So the kit is off everywhere by default. Nothing runs until a project opts in.
 | `hooks/walk-brief-guard.mjs` | PreToolUse Write/Edit/Bash/PowerShell | Blocks a walk brief that bans publishing or is missing its required lines and sections. |
 | `hooks/db-write-guard.mjs` | PreToolUse Bash/PowerShell | Keeps a live database read-only: reads pass, writes need a fresh go file. |
 | `hooks/no-idle.mjs` | Stop | Won't let a turn end with finished-but-unhandled workers, a stalled worker, or a running worker and no waiter. |
+| `hooks/double-check.mjs` | Stop | Blocks the first stop of every turn with a check-it-twice list; the second stop goes through, so it never loops. |
 | `hooks/wake.mjs` | Stop (asyncRewake) | Sleeps, then exits 2 so Claude wakes up with a worker status report. |
 
 ## Config keys
@@ -165,6 +166,23 @@ One example per key. Full working files are in `examples/`.
 - `timeZone`, `timeZoneName`, `label`, `hookName`, `footer` — the project's own words in the wake message.
 - `tokenModule` — optional path to a module exporting `tokenInfo(name)` and `tokenLine(info)`, for a per-worker token line.
 
+### `double-check`
+
+Scott, Oct 14 2026: "Check everything twice, read everything, do not skim, check the code."
+
+```json
+"double-check": {
+  "quote": "Scott, Oct 14 2026: \"Check everything twice, read everything, do not skim, check the code.\"",
+  "label": "mysite"
+}
+```
+
+- The first time a turn tries to end, the hook exits 2 with a checklist, so Claude makes one more pass. Claude Code marks the next stop with `stop_hook_active`, and the hook lets that one end the turn.
+- `quote` — the owner's own words, shown above the list (optional).
+- `checklist` — your own list of lines; the default is: re-read every changed file end to end, read the code each claim depends on, read every diff and output in full, name the proof for each fact, re-run the narrowest check, then start the reply with "Checked twice:".
+- `minToolCalls` — only ask after a turn with at least this many tool calls (default 0 = every turn). If the transcript cannot be read, it asks anyway.
+- `label` — the project name in the message.
+
 ## Turning the kit on or off
 
 **On, for one project.** Put a `.claude/hook-kit.json` in the project's root. Start from
@@ -276,7 +294,7 @@ example to read and adapt, not something the installer copies by default.
 node --test "tests/**/*.test.mjs"
 ```
 
-71 tests. Each hook has a parity suite that runs the reference hook and the kit hook on the
+77 tests. Each hook has a parity suite that runs the reference hook and the kit hook on the
 same input and compares the exit code and the message, using temp folders for the gate files,
 walk reports, findings list and runs folders. There are also scope tests: with no config every
 hook exits 0 and says nothing, `"enabled": false` switches the kit off, a missing section
@@ -300,9 +318,5 @@ any test loads. Passing the glob, or running `node --test` from inside `tests/`,
 
 - `lib/config.mjs` reads `cwd` from the hook event and falls back to the process working
   directory. That every event's stdin carries `cwd` is unverified; the fallback covers it.
-- The deploy gate compares the gate file's `commit` to the origin sha through two `mustEqual`
-  entries (`commit == originSha`, `testServerCommit == commit`) rather than one direct compare
-  against the sha. The example config writes `originSha` alongside `commit`; a gate file that
-  omits `originSha` is blocked where the original would have passed.
 - The original gate file's `ci` and `commit` checks are named in the messages, not hard-coded,
   so a project can rename them and still read a sensible block message.

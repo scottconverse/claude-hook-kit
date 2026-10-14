@@ -59,6 +59,11 @@
           },
           {
             "type": "command",
+            "command": "node \"<HOOK_KIT_DIR>/hooks/double-check.mjs\"",
+            "timeout": 10
+          },
+          {
+            "type": "command",
             "command": "node \"<HOOK_KIT_DIR>/hooks/wake.mjs\"",
             "timeout": 1800,
             "asyncRewake": true

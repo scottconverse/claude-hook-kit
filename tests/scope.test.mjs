@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { HOOKS, makeProject, mkTemp, rimraf, runHook, writeJson, writeText } from "./helpers.mjs";
 
-const ALL = ["inject-rules.mjs", "deploy-gate.mjs", "walk-brief-guard.mjs", "db-write-guard.mjs", "no-idle.mjs", "wake.mjs"];
+const ALL = ["inject-rules.mjs", "deploy-gate.mjs", "walk-brief-guard.mjs", "db-write-guard.mjs", "no-idle.mjs", "double-check.mjs", "wake.mjs"];
 
 // Inputs that would make each hook block if it were awake. With the kit off, none may.
 const TRIGGERS = {
@@ -14,6 +14,7 @@ const TRIGGERS = {
   "walk-brief-guard.mjs": JSON.stringify({ tool_name: "Write", tool_input: { file_path: "briefs/walk-x.md", content: "Do not publish." } }),
   "db-write-guard.mjs": JSON.stringify({ tool_name: "Bash", tool_input: { command: 'psql -p 5433 -d townreporter -c "DROP TABLE posts"' } }),
   "no-idle.mjs": JSON.stringify({ hook_event_name: "Stop" }),
+  "double-check.mjs": JSON.stringify({ hook_event_name: "Stop" }),
   "wake.mjs": JSON.stringify({ hook_event_name: "Stop" }),
 };
 

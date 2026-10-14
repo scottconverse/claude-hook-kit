@@ -98,6 +98,11 @@
     "hookName": "tr-no-idle.mjs"
   },
 
+  "double-check": {
+    "quote": "Scott, Oct 14 2026: \"Check everything twice, read everything, do not skim, check the code.\"",
+    "label": "TownReporter"
+  },
+
   "wake": {
     "minutes": 20,
     "runsDir": "C:/Users/scott/Desktop/Code/townreporter-deepseek-oversight/runs",
