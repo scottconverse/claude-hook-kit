@@ -1,7 +1,7 @@
 // Inject a project's rules file into every prompt (UserPromptSubmit / SessionStart).
 // Port of reference/tr-inject-rules.mjs: same JSON output shape, rules file from config.
 // Config section "inject-rules": { rulesFile, heading }
-//   rulesFile: path to the rules text (absolute, or relative to the config file's directory)
+//   rulesFile: path to the rules text (absolute, or relative to the project folder that holds .claude/)
 //   heading:   the line put in front of it
 import fs from "node:fs";
 import { loadFromStdin, resolveIn } from "../lib/config.mjs";

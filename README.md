@@ -1,5 +1,7 @@
 # claude-hook-kit
 
+Manual: [docs/MANUAL.md](docs/MANUAL.md) · Landing page: [docs/index.html](docs/index.html)
+
 Seven Claude Code hooks, made per-project: six ported from the hooks Scott ran before the kit, plus `double-check` (added Oct 14, 2026).
 
 The hooks Scott runs today live in `~/.claude/settings.json`, so they fire in **every** project.
@@ -18,7 +20,7 @@ folder tree to the nearest `.claude/hook-kit.json`. The nearest one wins.
 - **No config file anywhere up the tree → the hook does nothing** (exit 0, no output).
 - **`"enabled": false` at the top of a config → the whole kit is off for that folder tree.**
 - **A hook with no section in the config → that one hook is off.**
-- A relative path inside a config is relative to the config file's own folder.
+- A relative path inside a config is relative to the project folder: the folder that holds `.claude/`.
 
 So the kit is off everywhere by default. Nothing runs until a project opts in.
 
@@ -138,7 +140,7 @@ One example per key. Full working files are in `examples/`.
 ```
 
 - `runsDir` — the folder of worker folders. Missing folder means nothing to check.
-- `logNames` — log file names, tried in order; the first one that exists is the worker's log. The current hook reads only `run.jsonl`.
+- `logNames` — log file names, tried in order; the first one that exists is the worker's log. Default: `run.jsonl`, then `stream.jsonl`. (The original TownReporter hook read only `run.jsonl`; its example config sets that.)
 - `quietMinutes` — a running worker whose log has been quiet this long counts as stuck.
 - `handledFile` / `finishedFile` — the marker file names inside each worker folder.
 - `lookbackHours` — ignore workers whose log is older than this. Default 48.
@@ -159,7 +161,7 @@ One example per key. Full working files are in `examples/`.
 
 - `minutes` — how long to sleep before waking Claude.
 - `runsDir` — the same worker folder the no-idle hook reads.
-- `logNames` — like no-idle, but the default here is both `run.jsonl` and `stream.jsonl`, matching the current wake hook.
+- `logNames` — as in no-idle; the default is also `run.jsonl`, then `stream.jsonl`, matching the original wake hook.
 - `lockFile` — only one sleeper at a time. Default `.rewake-lock.json` inside `runsDir`.
 - `minutesFile` — a file holding a seconds value that overrides `minutes`, useful for tests. Default `.rewake-seconds` inside `runsDir`.
 - `quietMinutes`, `handledFile`, `finishedFile`, `lookbackHours` — as in no-idle.

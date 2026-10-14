@@ -77,7 +77,7 @@ test("double-check: off when its section is missing or enabled is false", async 
   }
 });
 
-test("relative paths in a config resolve against the config's own folder", async () => {
+test("relative paths in a config resolve against the project folder that holds .claude/", async () => {
   // Every hook that reads a path calls resolveIn(section.cfg, ...). Before the fix, section.cfg
   // was undefined and a relative path crashed the hook (exit 1). The minimal example uses them.
   const p = makeProject({ "inject-rules": { rulesFile: ".claude/RULES.md", heading: "R:" } });

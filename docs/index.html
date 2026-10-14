@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Seven Claude Code hooks, switched on per project. Each hook stays off until a project adds one config file that turns it on.">
+<title>claude-hook-kit</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --text: #1b1f24;
+  --muted: #3d4650;
+  --accent: #1a56b8;
+  --card-bg: #f3f5f8;
+  --edge: #7a8491;
+  --code-bg: #eceff3;
+  --code-text: #14181e;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111418;
+    --text: #eef1f5;
+    --muted: #c3cad4;
+    --accent: #9cc2ff;
+    --card-bg: #1a1f26;
+    --edge: #6b7584;
+    --code-bg: #0a0c0f;
+    --code-text: #e8ecf1;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 18px;
+  line-height: 1.6;
+}
+
+.wrap {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+header, section, footer {
+  padding: 32px 0;
+}
+header { padding-top: 40px; }
+section + section { border-top: 2px solid var(--edge); }
+footer { border-top: 2px solid var(--edge); color: var(--muted); }
+
+h1, h2, h3 {
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+h1 {
+  font-size: 2.25rem;
+  margin: 0 0 8px;
+}
+h2 {
+  font-size: 1.75rem;
+  margin: 0 0 16px;
+}
+h3 {
+  font-size: 1.25rem;
+  margin: 0 0 4px;
+}
+@media (min-width: 40rem) {
+  h1 { font-size: 2.75rem; }
+}
+
+p {
+  margin: 0 0 16px;
+}
+.promise {
+  font-size: 1.375rem;
+  font-weight: 600;
+  margin: 0 0 16px;
+}
+.muted {
+  color: var(--muted);
+}
+
+a {
+  color: var(--accent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+}
+a:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+
+code, pre {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 1em;
+}
+code {
+  background: var(--code-bg);
+  color: var(--code-text);
+  border-radius: 4px;
+  padding: 0 4px;
+  overflow-wrap: anywhere;
+}
+pre {
+  background: var(--code-bg);
+  color: var(--code-text);
+  border-radius: 8px;
+  padding: 16px;
+  margin: 0 0 16px;
+  max-width: 100%;
+  overflow-x: auto;
+  white-space: pre;
+}
+pre code {
+  background: none;
+  padding: 0;
+  overflow-wrap: normal;
+  white-space: pre;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+@media (min-width: 40rem) {
+  .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.card {
+  background: var(--card-bg);
+  border: 2px solid var(--edge);
+  border-radius: 8px;
+  padding: 16px;
+  margin: 0;
+  min-width: 0;
+}
+.card p {
+  margin: 0;
+}
+.card .event {
+  color: var(--muted);
+  margin: 0 0 8px;
+}
+
+ol.steps, ul.safe {
+  padding-left: 1.5em;
+  margin: 0;
+}
+ol.steps li, ul.safe li {
+  margin-bottom: 12px;
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>claude-hook-kit</h1>
+  <p class="promise">Guardrails for Claude Code, switched on per project.</p>
+  <p>Seven hooks for Claude Code. Install them once. Each one stays off in every folder until that folder opts in with one config file.</p>
+  <p class="muted">Install once, from a terminal:</p>
+  <pre><code>git clone https://github.com/scottconverse/claude-hook-kit
+cd claude-hook-kit
+node install.mjs</code></pre>
+  <p>Needs Node.js. No npm packages.</p>
+</header>
+
+<section id="what-you-get">
+  <h2>What you get</h2>
+  <p>Seven hooks. Each one has one job.</p>
+  <div class="cards">
+    <article class="card">
+      <h3>inject-rules</h3>
+      <p class="event">Event: SessionStart, UserPromptSubmit</p>
+      <p>Adds your project's rules file to Claude's context. It never blocks anything.</p>
+    </article>
+    <article class="card">
+      <h3>deploy-gate</h3>
+      <p class="event">Event: PreToolUse (Bash, PowerShell)</p>
+      <p>Blocks a deploy command until a gate file for the commit passes its checks.</p>
+    </article>
+    <article class="card">
+      <h3>walk-brief-guard</h3>
+      <p class="event">Event: PreToolUse (Write, Edit, Bash, PowerShell)</p>
+      <p>Blocks a walk brief that breaks a rule you set, such as a missing required section.</p>
+    </article>
+    <article class="card">
+      <h3>db-write-guard</h3>
+      <p class="event">Event: PreToolUse (Bash, PowerShell)</p>
+      <p>Blocks a command that can write to a live database, unless a fresh go file is present.</p>
+    </article>
+    <article class="card">
+      <h3>no-idle</h3>
+      <p class="event">Event: Stop</p>
+      <p>Blocks the end of a turn while background workers are left unattended.</p>
+    </article>
+    <article class="card">
+      <h3>double-check</h3>
+      <p class="event">Event: Stop</p>
+      <p>Blocks the end of a turn once, so Claude re-checks its work against a checklist.</p>
+    </article>
+    <article class="card">
+      <h3>wake</h3>
+      <p class="event">Event: Stop (runs in the background)</p>
+      <p>After a delay, 20 minutes by default, wakes Claude with a status list of its workers.</p>
+    </article>
+  </div>
+</section>
+
+<section id="how-it-works">
+  <h2>How it works</h2>
+  <ol class="steps">
+    <li><strong>Install once.</strong> Run <code>node install.mjs</code>. It adds the hooks to your Claude Code settings and backs up the settings file first.</li>
+    <li><strong>Opt in per project.</strong> Add <code>.claude/hook-kit.json</code> to the project folder. List only the hooks you want, with their settings.</li>
+    <li><strong>Hooks run only there.</strong> A hook looks for that file in its own folder, then in each folder above it. The nearest file wins. No file means no effect.</li>
+  </ol>
+</section>
+
+<section id="example">
+  <h2>Example config</h2>
+  <p>This is the <code>double-check</code> section from <code>examples/minimal.hook-kit.json</code>. Put it in <code>.claude/hook-kit.json</code> to turn that hook on in one project.</p>
+  <pre><code>{
+  "double-check": {
+    "quote": "Scott, Oct 14 2026: \"Check everything twice, read everything, do not skim, check the code.\"",
+    "label": "my project"
+  }
+}</code></pre>
+</section>
+
+<section id="safe-by-default">
+  <h2>Safe by default</h2>
+  <ul class="safe">
+    <li>Off until opted in. A hook does nothing in a folder with no config file, or with no section for that hook.</li>
+    <li>The installer backs up your settings file before it changes it.</li>
+    <li>It never duplicates entries. Running the installer again replaces the kit's own entries.</li>
+    <li>Uninstall removes only the kit's entries. Your other hooks stay.</li>
+    <li>No npm dependencies. The kit uses Node.js and its built-in modules.</li>
+  </ul>
+</section>
+
+<section id="read-more">
+  <h2>Read more</h2>
+  <p><a href="MANUAL.md">Read the manual</a>: install, quick start, every hook, and every config key.</p>
+  <p><a href="https://github.com/scottconverse/claude-hook-kit">Source on GitHub</a></p>
+</section>
+
+<footer>
+  <p><a href="../LICENSE">MIT License</a> · <a href="https://github.com/scottconverse/claude-hook-kit">GitHub</a></p>
+</footer>
+
+</div>
+</body>
+</html>
