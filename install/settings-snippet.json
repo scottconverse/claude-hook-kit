@@ -1,0 +1,70 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"C:/Users/scott/Desktop/Code/claude-hook-kit/hooks/inject-rules.mjs\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"C:/Users/scott/Desktop/Code/claude-hook-kit/hooks/inject-rules.mjs\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"C:/Users/scott/Desktop/Code/claude-hook-kit/hooks/deploy-gate.mjs\"",
+            "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "node \"C:/Users/scott/Desktop/Code/claude-hook-kit/hooks/db-write-guard.mjs\"",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"C:/Users/scott/Desktop/Code/claude-hook-kit/hooks/walk-brief-guard.mjs\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"C:/Users/scott/Desktop/Code/claude-hook-kit/hooks/no-idle.mjs\"",
+            "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "node \"C:/Users/scott/Desktop/Code/claude-hook-kit/hooks/wake.mjs\"",
+            "asyncRewake": true,
+            "timeout": 1800
+          }
+        ]
+      }
+    ]
+  }
+}

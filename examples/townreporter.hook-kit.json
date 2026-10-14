@@ -1,0 +1,117 @@
+{
+  "enabled": true,
+
+  "inject-rules": {
+    "rulesFile": "C:/Users/scott/.claude/skills/townreporter-release-path/RULES.md",
+    "heading": "SCOTT'S NEVER-FORGET RULES (from skill townreporter-release-path; obey every line, no exceptions):"
+  },
+
+  "deploy-gate": {
+    "commandPattern": "deploy-production[.]ps1|promote[.]ps1",
+    "skipPatterns": [
+      "<<|Set-Content|Add-Content|Out-File|\\becho\\b|\\bprintf\\b|\\bgrep\\b|\\bcat\\b\\s*>|Select-String",
+      "-Rollback\\b|\\brollback\\b|-WhatIf\\b"
+    ],
+    "repoDir": "C:/Users/scott/Desktop/Code/townreporter-web",
+    "shaFrom": "origin/main",
+    "gatesDir": "C:/Users/scott/Desktop/Code/townreporter-deepseek-oversight/gates",
+    "requiredKeys": [
+      { "key": "devServerRun", "test": "length", "min": 8, "message": "devServerRun: what ran on :3100 and the result" },
+      { "key": "ci", "test": "ieq", "expected": "PASS", "message": "ci must be \"PASS\"" },
+      { "key": "announcedAt", "message": "announcedAt: the time announced to Scott" }
+    ],
+    "mustEqual": [
+      { "key": "commit", "other": "originSha", "message": "commit must equal the origin/main sha" },
+      { "key": "testServerCommit", "other": "commit", "message": "testServerCommit must equal the sha (Test server must run this exact build)" }
+    ],
+    "reportKey": "publishWalkReport",
+    "reportMustContain": "^PUBLISH-WALK:\\s*PASS\\s*$",
+    "reportMustContainMessage": "walk report must contain the line \"PUBLISH-WALK: PASS\"",
+    "findingsFile": "C:/Users/scott/Desktop/Goals/TownReporter-OPEN-FINDINGS.md",
+    "openPattern": "^\\|\\s*([A-Z][A-Z0-9-]*\\d)\\s*\\|\\s*OPEN\\b[^|]*\\|\\s*([^|]*)\\|",
+    "textOnlyKey": "textOnly",
+    "textOnly": {
+      "filesKey": "textFiles",
+      "filesMessage": "textFiles: the page files this text change touches",
+      "extraMessage": "not text-only; these files also changed: "
+    },
+    "skillName": "Scott's release path (skill townreporter-release-path)",
+    "label": "TownReporter",
+    "pathLine": "Path: branch -> dev server :3100 -> Test server :3400 FULL walk incl. Publish -> production.",
+    "nextStep": "Do the missing tier, then write the gate file."
+  },
+
+  "walk-brief-guard": {
+    "pathPattern": "briefs[\\\\/]+walk-[^\\\\/\\s\"']+\\.md",
+    "heredocPattern": "<<",
+    "bannedPatterns": [
+      {
+        "pattern": "do not (press )?publish|never (press )?publish|no publishing|do not publish, delete|don't (press )?publish",
+        "message": "it bans publishing (\"do not publish\"). The Test server is a disposable copy: publishing there is the point."
+      }
+    ],
+    "requiredLines": [
+      {
+        "pattern": "PUBLISH-WALK",
+        "onlyFullBody": true,
+        "message": "it has no \"PUBLISH-WALK: PASS or FAIL\" closing line and no publish path."
+      }
+    ],
+    "requiredSections": [
+      {
+        "pattern": "^EVERY DOOR:",
+        "onlyFullBody": true,
+        "message": "it has no \"EVERY DOOR:\" section listing every place on the desk where each tested job can be done (for example Kill: Queue row button, X key, bulk strip, Today, Story page)."
+      }
+    ],
+    "skillName": "Scott's release path (skill townreporter-release-path)",
+    "footer": "Every walk brief must have the walker press Publish for real on the Test server (draft -> Publish -> bar words -> Published list -> public page -> gone from Drafts) and end with the exact line PUBLISH-WALK: PASS or PUBLISH-WALK: FAIL."
+  },
+
+  "db-write-guard": {
+    "port": 5433,
+    "databases": ["townreporter"],
+    "clientPattern": "\\bpsql(\\.exe)?\\b|\\bpg_restore\\b|\\bdropdb\\b|\\bcreatedb\\b|\\bpg_ctl\\b",
+    "skipPattern": "<<|Set-Content|Add-Content|Out-File|\\bgrep\\b|Select-String",
+    "sqlArgPattern": "-c\\s|-f\\s|--command|--file",
+    "writePattern": "\\b(insert|update|delete|drop|alter|truncate|create|grant|revoke|vacuum|reindex|cluster|copy)\\b",
+    "filePattern": "(^|\\s)(-f|--file)[\\s=]",
+    "restorePattern": "\\bpg_restore\\b|\\bdropdb\\b|\\bcreatedb\\b",
+    "okFile": "C:/Users/scott/Desktop/Code/townreporter-deepseek-oversight/gates/live-db-write-ok.txt",
+    "okMinutes": 30,
+    "skillName": "Scott's release path (skill townreporter-release-path)",
+    "label": "the live paper's database",
+    "explanation": "The live paper is read-only for me. Data changes go through the tested path (dev server -> Test server -> announced, backed-up deploy)."
+  },
+
+  "no-idle": {
+    "runsDir": "C:/Users/scott/Desktop/Code/townreporter-deepseek-oversight/runs",
+    "logNames": ["run.jsonl"],
+    "handledFile": "handled.txt",
+    "finishedFile": "finished.txt",
+    "quietMinutes": 15,
+    "lookbackHours": 48,
+    "waiterHeartbeat": "C:/Users/scott/Desktop/Code/townreporter-deepseek-oversight/runs/.waiter-heartbeat",
+    "waiterFreshMinutes": 3,
+    "waiterHint": "Arm one in the background: bash C:/Users/scott/Desktop/Code/townreporter-deepseek-oversight/tools/wait-workers.sh <names>",
+    "handledHint": "Act now: read runs\\<name>\\last.txt, START the next step (dev, Test walk, gate, deploy, or a fix worker),\n  then write runs\\<name>\\handled.txt with one line: the time, and the next step you started.",
+    "stuckHint": "Diagnose and relaunch, or mark handled.txt if dead on purpose.",
+    "hookName": "tr-no-idle.mjs"
+  },
+
+  "wake": {
+    "minutes": 20,
+    "runsDir": "C:/Users/scott/Desktop/Code/townreporter-deepseek-oversight/runs",
+    "logNames": ["run.jsonl", "stream.jsonl"],
+    "handledFile": "handled.txt",
+    "finishedFile": "finished.txt",
+    "quietMinutes": 15,
+    "lookbackHours": 48,
+    "timeZone": "America/Denver",
+    "timeZoneName": "Mountain",
+    "label": "TownReporter",
+    "hookName": "tr-wake-20.mjs",
+    "tokenModule": "C:/Users/scott/Desktop/Code/townreporter-deepseek-oversight/tools/worker-tokens.mjs",
+    "footer": "Check every worker and server; start the next step for anything finished; relaunch anything stalled; report to Scott in 3 lines."
+  }
+}

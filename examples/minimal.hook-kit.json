@@ -1,0 +1,26 @@
+{
+  "enabled": true,
+
+  "inject-rules": {
+    "rulesFile": ".claude/RULES.md",
+    "heading": "PROJECT RULES (obey every line, no exceptions):"
+  },
+
+  "db-write-guard": {
+    "port": 5432,
+    "databases": ["myapp"],
+    "clientPattern": "\\bpsql(\\.exe)?\\b|\\bpg_restore\\b|\\bdropdb\\b|\\bcreatedb\\b",
+    "restorePattern": "\\bpg_restore\\b|\\bdropdb\\b|\\bcreatedb\\b",
+    "okFile": ".claude/live-db-write-ok.txt",
+    "okMinutes": 30,
+    "label": "the live database",
+    "explanation": "The live database is read-only for me; go through the tested path."
+  },
+
+  "wake": {
+    "minutes": 20,
+    "runsDir": ".claude/runs",
+    "logNames": ["run.jsonl"],
+    "label": "my project"
+  }
+}
