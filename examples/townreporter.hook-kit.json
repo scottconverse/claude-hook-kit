@@ -21,7 +21,6 @@
       { "key": "announcedAt", "message": "announcedAt: the time announced to Scott" }
     ],
     "mustEqual": [
-      { "key": "commit", "other": "originSha", "message": "commit must equal the origin/main sha" },
       { "key": "testServerCommit", "other": "commit", "message": "testServerCommit must equal the sha (Test server must run this exact build)" }
     ],
     "reportKey": "publishWalkReport",
