@@ -181,33 +181,94 @@ One example per key. Full working files are in `examples/`.
 **Off everywhere.** Remove the `hooks` block from `~/.claude/settings.json`. With no hook
 registered nothing runs, and `reference/` still holds the originals.
 
-## Install
+## Install on a new machine
 
-1. Keep the kit where it is, or move it, and note the real path — the commands below are
-   absolute.
-2. Copy the values from `examples/townreporter.hook-kit.json` into a config. To reproduce
-   today's behavior exactly, put it at `C:/Users/scott/Desktop/Code/.claude/hook-kit.json`,
-   which covers both TownReporter repos and the oversight repo.
-3. **Back up the settings first:**
-
-   ```
-   copy "%USERPROFILE%\.claude\settings.json" "%USERPROFILE%\.claude\settings.json.bak"
-   ```
-
-4. Replace the `hooks` block in `~/.claude/settings.json` with the contents of
-   `install/settings-snippet.json`. That file has the same events, matchers, `asyncRewake` flag
-   and timeouts as today, pointed at this kit's scripts. Merge it into whatever else is already
-   in that file rather than replacing the whole file.
-5. Restart Claude Code, or run `/hooks` to reload.
-
-## Roll back
+Node 18 or newer, and no npm packages — the installers use only Node's built-ins.
 
 ```
-copy "%USERPROFILE%\.claude\settings.json.bak" "%USERPROFILE%\.claude\settings.json"
+git clone <this repo> claude-hook-kit
+cd claude-hook-kit
+node install.mjs
 ```
 
-That restores the settings exactly as they were before the install. The kit's own files are
-untouched by an install, so a rollback needs nothing else.
+That is the whole install. It:
+
+1. Copies `hooks/` and `lib/` into `<settings folder>/hook-kit/`, so the clone can be moved or
+   deleted afterward.
+2. Merges the kit's hook entries into `<settings folder>/settings.json` — creating the file if
+   it is missing — with the same events, matchers, timeouts and `asyncRewake` flag as the rest
+   of this README describes. Every other hook and every other setting in that file is left
+   alone.
+3. Writes a backup first: `settings.json.bak-hookkit-<yyyyMMdd-HHmmss>` beside the settings
+   file. It prints the path it used.
+
+Re-running it is safe: it replaces its own entries rather than adding them again, so there are
+never duplicates. It also recognizes entries left by an older local clone
+(`claude-hook-kit/hooks/`) and replaces those.
+
+The **settings folder** is, in order of precedence: `--config-dir <dir>`, the
+`CLAUDE_CONFIG_DIR` environment variable, then `<home>/.claude`. On Windows that last one is
+`%USERPROFILE%\.claude`.
+
+```
+node install.mjs --dry-run      # print the settings it would write, change nothing
+node install.mjs --config-dir "D:/claude-config"
+```
+
+Then give a project its config:
+
+```
+node init-project.mjs <projectDir>                    # writes <projectDir>/.claude/hook-kit.json
+node init-project.mjs <projectDir> --example townreporter
+```
+
+It copies one of the files in `examples/`, and refuses to overwrite an existing config unless
+you pass `--force`.
+
+### Turning a hook on or off
+
+Edit that project's `.claude/hook-kit.json`. The keys are described above under **Config keys**;
+`examples/minimal.hook-kit.json` is a small file to copy from. A hook with no section in the
+config stays off. To switch the whole kit off for a folder tree, set `"enabled": false` at the
+top of the file.
+
+**The hooks do nothing in a folder with no `.claude/hook-kit.json`.** The kit is off
+everywhere until a project asks for it.
+
+### Uninstall
+
+```
+node uninstall.mjs                    # removes the kit's hook entries, keeps every other hook and setting
+node uninstall.mjs --remove-files     # also deletes <settings folder>/hook-kit/
+node uninstall.mjs --dry-run
+```
+
+It backs up first and removes only the entries the kit owns.
+
+### Roll back
+
+Restore the backup the installer printed:
+
+```
+copy "%USERPROFILE%\.claude\settings.json.bak-hookkit-20261014-131205" "%USERPROFILE%\.claude\settings.json"
+```
+
+(or `cp` on macOS and Linux.) That puts the settings back exactly as they were. Or run
+`node uninstall.mjs`, which removes the kit's entries and leaves the rest.
+
+### The snippet file
+
+`install/settings-snippet.json` is the `hooks` block the installer merges, shown for reading.
+It uses the placeholder `<HOOK_KIT_DIR>` where the installer puts the real path, so it names no
+machine. It is generated from `lib/hook-entries.mjs` by `node tools/write-snippet.mjs`, the
+same module `install.mjs` builds from, so the two cannot drift.
+
+### About the examples
+
+`examples/townreporter.hook-kit.json` is a real, working config from Scott's own machine, so it
+names Scott's paths (`C:/Users/scott/...`) and Scott's project folders. That is fine: it is an
+example to read and adapt, not something the installer copies by default.
+`node init-project.mjs` uses `examples/minimal.hook-kit.json` unless you ask for the other one.
 
 ## Tests
 
@@ -215,11 +276,18 @@ untouched by an install, so a rollback needs nothing else.
 node --test "tests/**/*.test.mjs"
 ```
 
-61 tests. Each hook has a parity suite that runs the reference hook and the kit hook on the
+71 tests. Each hook has a parity suite that runs the reference hook and the kit hook on the
 same input and compares the exit code and the message, using temp folders for the gate files,
 walk reports, findings list and runs folders. There are also scope tests: with no config every
 hook exits 0 and says nothing, `"enabled": false` switches the kit off, a missing section
 switches one hook off, the nearest config wins, and the event's `cwd` drives the lookup.
+
+`tests/install.test.mjs` covers the installers — a fresh install writes the kit hooks, an
+unrelated hook (`notify.ps1`) and unrelated settings survive, a second install adds no
+duplicates, the old local-clone path is replaced, backups are written and never clobbered,
+`--dry-run` writes nothing, uninstall removes only kit entries, and `init-project` writes and
+refuses to overwrite. Every case uses a temp settings folder and never touches the real
+`~/.claude`:
 
 `npm test` runs the same command.
 

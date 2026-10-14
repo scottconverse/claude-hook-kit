@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"C:/Users/scott/Desktop/Code/claude-hook-kit/hooks/inject-rules.mjs\"",
+            "command": "node \"<HOOK_KIT_DIR>/hooks/inject-rules.mjs\"",
             "timeout": 10
           }
         ]
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"C:/Users/scott/Desktop/Code/claude-hook-kit/hooks/inject-rules.mjs\"",
+            "command": "node \"<HOOK_KIT_DIR>/hooks/inject-rules.mjs\"",
             "timeout": 10
           }
         ]
@@ -28,12 +28,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"C:/Users/scott/Desktop/Code/claude-hook-kit/hooks/deploy-gate.mjs\"",
+            "command": "node \"<HOOK_KIT_DIR>/hooks/deploy-gate.mjs\"",
             "timeout": 30
           },
           {
             "type": "command",
-            "command": "node \"C:/Users/scott/Desktop/Code/claude-hook-kit/hooks/db-write-guard.mjs\"",
+            "command": "node \"<HOOK_KIT_DIR>/hooks/db-write-guard.mjs\"",
             "timeout": 10
           }
         ]
@@ -43,7 +43,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"C:/Users/scott/Desktop/Code/claude-hook-kit/hooks/walk-brief-guard.mjs\"",
+            "command": "node \"<HOOK_KIT_DIR>/hooks/walk-brief-guard.mjs\"",
             "timeout": 10
           }
         ]
@@ -54,14 +54,14 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"C:/Users/scott/Desktop/Code/claude-hook-kit/hooks/no-idle.mjs\"",
+            "command": "node \"<HOOK_KIT_DIR>/hooks/no-idle.mjs\"",
             "timeout": 30
           },
           {
             "type": "command",
-            "command": "node \"C:/Users/scott/Desktop/Code/claude-hook-kit/hooks/wake.mjs\"",
-            "asyncRewake": true,
-            "timeout": 1800
+            "command": "node \"<HOOK_KIT_DIR>/hooks/wake.mjs\"",
+            "timeout": 1800,
+            "asyncRewake": true
           }
         ]
       }
