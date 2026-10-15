@@ -7,6 +7,7 @@
 //   clientPattern  regex string matching the client/tool commands (psql, pg_restore, ...)
 //   okFile         file whose mtime is the go; missing or old = no go
 //   okMinutes      how long the go lasts
+//   ownerName      the owner's name in the block message, e.g. "Scott" (default "the owner")
 import fs from "node:fs";
 import { loadFromStdin, resolveIn, rx } from "../lib/config.mjs";
 
@@ -54,6 +55,7 @@ const ok = resolveIn(section.cfg, s.okFile);
 // string a TownReporter-era reader recognises.
 const okShown = ok.replace(/\\/g, "/");
 const okMinutes = Number(s.okMinutes ?? 30);
+const owner = String(s.ownerName || "the owner");
 let fresh = false;
 try {
   fresh = Date.now() - fs.statSync(ok).mtimeMs < okMinutes * 60 * 1000;
@@ -63,6 +65,6 @@ if (fresh) process.exit(0);
 console.error(
   "BLOCKED by " + (s.skillName ? s.skillName + ": " : "") + "this command can WRITE to " + String(s.label || "the live database") + " (port " + s.port + (wanted.length ? ", database " + wanted.join("/") : "") + ").\n" +
     String(s.explanation || "The live database is read-only for me.") + "\n" +
-    "If Scott has said go in chat for this exact change: take a backup, announce the time, then create " + okShown + " with the script name and the time in it (valid " + okMinutes + " minutes), and run the command again.",
+    "If " + owner + " has said go in chat for this exact change: take a backup, announce the time, then create " + okShown + " with the script name and the time in it (valid " + okMinutes + " minutes), and run the command again.",
 );
 process.exit(2);

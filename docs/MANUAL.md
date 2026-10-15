@@ -338,6 +338,7 @@ Config keys:
 - `okMinutes`: number. Default: 30.
 - `label`: text. Default: `the live database`.
 - `explanation`: text. Default: `The live database is read-only for me.`
+- `ownerName`: text. Default: `the owner`. The name in the go line, for example `Scott`. Without it, the line says `If the owner has said go in chat`.
 - `skillName`: text. Default: none. Prefix on the block message.
 
 ```json
@@ -358,11 +359,12 @@ The block message looks like this:
 ```
 BLOCKED by my-release-skill: this command can WRITE to the live database (port 5432, database myapp).
 The live database is read-only for me; go through the tested path.
-If Scott has said go in chat for this exact change: take a backup, announce the time, then create .claude/live-db-write-ok.txt with the script name and the time in it (valid 30 minutes), and run the command again.
+If the owner has said go in chat for this exact change: take a backup, announce the time, then create .claude/live-db-write-ok.txt with the script name and the time in it (valid 30 minutes), and run the command again.
 ```
 
-The wording of the last line is fixed in the hook. The config fills in the `okFile` path and
-`okMinutes`, but it cannot change the wording.
+The wording of the last line is fixed in the hook, except the owner's name. The config fills in the
+`okFile` path, `okMinutes`, and `ownerName` (set `"ownerName": "Scott"` and the line says
+`If Scott has said go`).
 
 Turn it off by deleting the section.
 
@@ -697,6 +699,7 @@ start a line.
 | `db-write-guard` | `okMinutes` | number | `30` | How long a go lasts. |
 | `db-write-guard` | `label` | text | `the live database` | Name used in the block message. |
 | `db-write-guard` | `explanation` | text | `The live database is read-only for me.` | Second line of the block message. |
+| `db-write-guard` | `ownerName` | text | `the owner` | The owner's name in the go line of the block message. |
 | `db-write-guard` | `skillName` | text | none | Prefix on the block message. |
 | `no-idle` | `runsDir` | path | none | Folder of worker folders. |
 | `no-idle` | `logNames` | list | `["run.jsonl", "stream.jsonl"]` | Log file names, first one found wins. |

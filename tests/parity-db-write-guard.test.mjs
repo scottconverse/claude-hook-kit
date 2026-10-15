@@ -23,6 +23,7 @@ function fixture() {
       restorePattern: "\\bpg_restore\\b|\\bdropdb\\b|\\bcreatedb\\b",
       okFile: ok,
       okMinutes: 30,
+      ownerName: "Scott",
       skillName: "Scott's release path (skill townreporter-release-path)",
       label: "the live paper's database",
       explanation: "The live paper is read-only for me. Data changes go through the tested path (dev server -> Test server -> announced, backed-up deploy).",

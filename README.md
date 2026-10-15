@@ -123,6 +123,7 @@ One example per key. Full working files are in `examples/`.
 - `databases` — names that mean "the live one". A test or dev database on the same port is left alone. No database named at all counts as aimed at the live one.
 - `okFile` — a file whose modification time is the go-ahead. Missing or older than `okMinutes` means no go.
 - `okMinutes` — how long a go lasts.
+- `ownerName` — the owner's name in the go line of the block message, e.g. `"Scott"`. Default: `the owner`.
 - `clientPattern`, `writePattern`, `filePattern`, `restorePattern`, `skipPattern`, `sqlArgPattern`, `portPattern` — optional overrides for the matching rules; the defaults match the current hook.
 - `skillName`, `label`, `explanation` — the project's own words in the block message.
 
