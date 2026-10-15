@@ -175,7 +175,7 @@ Scott, Oct 14 2026: "Check everything twice, read everything, do not skim, check
 
 ```json
 "double-check": {
-  "quote": "Scott, Oct 14 2026: \"Check everything twice, read everything, do not skim, check the code.\"",
+  "quote": "Owner: \"Check everything twice, read everything, do not skim, check the code.\"",
   "label": "mysite"
 }
 ```
