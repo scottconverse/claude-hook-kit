@@ -1,0 +1,126 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import { HOOKS, makeProject, rimraf, runHook, writeText } from "./helpers.mjs";
+
+const HOOK = path.join(HOOKS, "read-ledger-gate.mjs");
+const write = (cwd, file_path, content = "x") => JSON.stringify({ hook_event_name: "PreToolUse", tool_name: "Write", cwd, tool_input: { file_path, content } });
+const edit = (cwd, file_path) => JSON.stringify({ hook_event_name: "PreToolUse", tool_name: "Edit", cwd, tool_input: { file_path, old_string: "a", new_string: "b" } });
+const bash = (cwd, command) => JSON.stringify({ hook_event_name: "PreToolUse", tool_name: "Bash", cwd, tool_input: { command } });
+
+// A project with an "upstream" folder holding two real files of known length.
+function project(extra = {}) {
+  const p = makeProject({ "read-ledger-gate": { upstreamRoots: ["upstream"], ...extra } });
+  writeText(path.join(p.root, "upstream", "engines.ts"), "a\nb\nc\n"); // 3 lines
+  writeText(path.join(p.root, "upstream", "ladder.ts"), "1\n2\n3\n4\n5"); // 5 lines, no final newline
+  return p;
+}
+
+test("read-ledger-gate: a code write with no ledger is blocked", async () => {
+  const p = project({ label: "Demo" });
+  try {
+    const got = await runHook(HOOK, write(p.cwd, path.join(p.root, "src", "app.ts")), { cwd: p.cwd });
+    assert.equal(got.code, 2);
+    assert.match(got.stderr, /^BLOCKED by read-ledger-gate \(Demo\)/);
+    assert.match(got.stderr, /the ledger file does not exist/);
+    assert.match(got.stderr, /READ-LEDGER\.md/);
+  } finally {
+    rimraf(p.root);
+  }
+});
+
+test("read-ledger-gate: a complete, true ledger lets code through", async () => {
+  const p = project();
+  try {
+    writeText(path.join(p.root, ".claude", "READ-LEDGER.md"), "# Read\n- engines.ts — 3 lines\n- `ladder.ts` — 5 lines\n");
+    for (const ev of [write(p.cwd, path.join(p.root, "src", "app.ts")), edit(p.cwd, "src/app.ts"), bash(p.cwd, "cat <<'EOF' > src/x.mjs\nhi\nEOF")]) {
+      const got = await runHook(HOOK, ev, { cwd: p.cwd });
+      assert.equal(got.code, 0, got.stderr);
+      assert.equal(got.stderr, "");
+    }
+  } finally {
+    rimraf(p.root);
+  }
+});
+
+test("read-ledger-gate: a wrong line count is caught", async () => {
+  const p = project();
+  try {
+    writeText(path.join(p.root, ".claude", "READ-LEDGER.md"), "- engines.ts — 300 lines\n");
+    const got = await runHook(HOOK, write(p.cwd, "src/app.ts"), { cwd: p.cwd });
+    assert.equal(got.code, 2);
+    assert.match(got.stderr, /row says 300 lines but engines\.ts has 3/);
+  } finally {
+    rimraf(p.root);
+  }
+});
+
+test("read-ledger-gate: a made-up file is caught", async () => {
+  const p = project();
+  try {
+    writeText(path.join(p.root, ".claude", "READ-LEDGER.md"), "| nothere.ts | 12 |\n");
+    const got = await runHook(HOOK, write(p.cwd, "src/app.ts"), { cwd: p.cwd });
+    assert.equal(got.code, 2);
+    assert.match(got.stderr, /does not exist under any upstream root: nothere\.ts/);
+  } finally {
+    rimraf(p.root);
+  }
+});
+
+test("read-ledger-gate: minEntries, minLines and mustMention", async () => {
+  const p = project({ minEntries: 2, minLines: 8, mustMention: ["wagalo"] });
+  try {
+    writeText(path.join(p.root, ".claude", "READ-LEDGER.md"), "- engines.ts — 3 lines\n");
+    let got = await runHook(HOOK, write(p.cwd, "src/app.ts"), { cwd: p.cwd });
+    assert.equal(got.code, 2);
+    assert.match(got.stderr, /ledger has 1 row\(s\); at least 2 needed/);
+    assert.match(got.stderr, /3 real lines read; at least 8 needed/);
+    assert.match(got.stderr, /no row mentions "wagalo"/);
+
+    fs.mkdirSync(path.join(p.root, "upstream", "wagalo"), { recursive: true });
+    fs.renameSync(path.join(p.root, "upstream", "ladder.ts"), path.join(p.root, "upstream", "wagalo", "ladder.ts"));
+    writeText(path.join(p.root, ".claude", "READ-LEDGER.md"), "- engines.ts — 3 lines\n- wagalo/ladder.ts — 5 lines\n");
+    got = await runHook(HOOK, write(p.cwd, "src/app.ts"), { cwd: p.cwd });
+    assert.equal(got.code, 0, got.stderr);
+  } finally {
+    rimraf(p.root);
+  }
+});
+
+test("read-ledger-gate: docs, config, the ledger itself and non-write shell commands are never gated", async () => {
+  const p = project();
+  try {
+    const free = [
+      write(p.cwd, path.join(p.root, "README.md")),
+      write(p.cwd, path.join(p.root, ".claude", "READ-LEDGER.md"), "- engines.ts — 3 lines"),
+      write(p.cwd, path.join(p.root, ".claude", "hook-kit.json")),
+      write(p.cwd, "notes/plan.txt"),
+      bash(p.cwd, "node --test tests/x.test.mjs"),
+      bash(p.cwd, "git diff -- src/app.ts"),
+      bash(p.cwd, "cat src/app.ts | head"),
+    ];
+    for (const ev of free) {
+      const got = await runHook(HOOK, ev, { cwd: p.cwd });
+      assert.equal(got.code, 0, ev + "\n" + got.stderr);
+    }
+    // A shell write to code is gated.
+    const got = await runHook(HOOK, bash(p.cwd, "echo 'x' > src/app.ts"), { cwd: p.cwd });
+    assert.equal(got.code, 2);
+  } finally {
+    rimraf(p.root);
+  }
+});
+
+test("read-ledger-gate: off when its section is missing or enabled is false", async () => {
+  for (const config of [{ "inject-rules": {} }, { "read-ledger-gate": { enabled: false } }, { enabled: false, "read-ledger-gate": {} }]) {
+    const p = makeProject(config);
+    try {
+      const got = await runHook(HOOK, write(p.cwd, "src/app.ts"), { cwd: p.cwd });
+      assert.equal(got.code, 0, JSON.stringify(config));
+      assert.equal(got.stderr, "");
+    } finally {
+      rimraf(p.root);
+    }
+  }
+});

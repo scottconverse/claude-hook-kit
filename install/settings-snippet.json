@@ -45,6 +45,11 @@
             "type": "command",
             "command": "node \"<HOOK_KIT_DIR>/hooks/walk-brief-guard.mjs\"",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "node \"<HOOK_KIT_DIR>/hooks/read-ledger-gate.mjs\"",
+            "timeout": 15
           }
         ]
       }
@@ -61,6 +66,11 @@
             "type": "command",
             "command": "node \"<HOOK_KIT_DIR>/hooks/double-check.mjs\"",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "node \"<HOOK_KIT_DIR>/hooks/measure-gate.mjs\"",
+            "timeout": 30
           },
           {
             "type": "command",

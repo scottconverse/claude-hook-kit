@@ -2,20 +2,21 @@
 
 This manual is for a developer who uses Claude Code and has not seen this kit before. It
 covers what the kit does, how to install it, how to turn on a hook in a project, what each of
-the seven hooks checks, and how to roll back.
+the nine hooks checks, and how to roll back.
 
 Contents: [What the kit is](#1-what-the-kit-is) · [Requirements](#2-requirements) ·
 [Install](#3-install) · [Quick start](#4-quick-start-turn-on-double-check) ·
-[How a hook finds its config](#5-how-a-hook-finds-its-config) · [The seven hooks](#6-the-seven-hooks) ·
+[How a hook finds its config](#5-how-a-hook-finds-its-config) · [The nine hooks](#6-the-nine-hooks) ·
 [Exit codes](#7-exit-codes) · [Uninstall and roll back](#8-uninstall-and-roll-back) ·
 [Testing](#9-testing) · [Troubleshooting](#10-troubleshooting) ·
 [Config key reference](#11-config-key-reference)
 
 ## 1. What the kit is
 
-The kit is seven hook scripts for Claude Code, plus an installer and a per-project config file.
+The kit is nine hook scripts for Claude Code, plus an installer and a per-project config file.
 The hooks block a few common mistakes: a deploy with no gate, a write to a live database, a walk
-brief that skips a required step, and a turn that ends too early. The kit is off everywhere until
+brief that skips a required step, a turn that ends too early, code written before the upstream code
+was read, and a turn that ends "done" with no fresh measurement. The kit is off everywhere until
 a project opts in. A project opts in by adding `.claude/hook-kit.json`, and the hooks do nothing
 in a folder that has no such file.
 
@@ -42,7 +43,7 @@ The installer does four things:
 2. Backs up `settings.json` to `settings.json.bak-hookkit-<yyyyMMdd-HHmmss>` beside it, if the
    file exists. If that name is taken, it adds `-2`, `-3` and so on, so a backup is never
    overwritten. It prints the path it used.
-3. Merges the kit's seven hook entries into `settings.json`, creating the file if it is missing.
+3. Merges the kit's nine hook entries into `settings.json`, creating the file if it is missing.
    Every other hook and every other setting in the file stays as it was.
 4. Prints what it changed.
 
@@ -132,16 +133,18 @@ This walk-through turns on one hook, `double-check`, in one project.
 - A regex string that does not compile turns off the check it belongs to. The hook gives no
   message.
 
-## 6. The seven hooks
+## 6. The nine hooks
 
 | Hook | Event | Matcher | Timeout | What it can do |
 |---|---|---|---|---|
 | `inject-rules` | `SessionStart`, `UserPromptSubmit` | none | 10 | Adds a rules file to Claude's context. Never blocks. |
 | `deploy-gate` | `PreToolUse` | `Bash\|PowerShell` | 30 | Blocks a tool call that deploys until a gate file passes. |
 | `walk-brief-guard` | `PreToolUse` | `Write\|Edit\|Bash\|PowerShell` | 10 | Blocks a walk brief that breaks a required rule. |
+| `read-ledger-gate` | `PreToolUse` | `Write\|Edit\|Bash\|PowerShell` | 15 | Blocks a write to code until the read ledger is complete and true. |
 | `db-write-guard` | `PreToolUse` | `Bash\|PowerShell` | 10 | Blocks a command that can write to a live database. |
 | `no-idle` | `Stop` | none | 30 | Blocks the end of a turn while workers are unattended. |
 | `double-check` | `Stop` | none | 10 | Blocks the end of a turn once, so Claude checks its work. |
+| `measure-gate` | `Stop` | none | 30 | Blocks the end of a turn while code is newer than the newest receipt. |
 | `wake` | `Stop` (`asyncRewake: true`) | none | 1800 | After a delay, wakes Claude with worker status. |
 
 The events, matchers and timeouts come from `lib/hook-entries.mjs`. The matcher is the list of
@@ -518,6 +521,92 @@ Check every worker and server; start the next step for anything finished; relaun
 
 Turn it off by deleting the section. A timer that is already running is not stopped by this.
 
+### 6.8 read-ledger-gate
+
+No code until the upstream code was read. Added Oct 15, 2026, after three agents in a row skipped
+that step on one project.
+
+- Events: `PreToolUse`. Matcher: `Write|Edit|Bash|PowerShell`. Timeout: 15.
+- A `Write` or `Edit` whose path matches `codePattern` is gated. A shell command is gated when it
+  matches `shellWritePattern` and names a code path. Paths matching `exemptPattern`, and the ledger
+  itself, are never gated.
+- The ledger is read line by line. Each line matching `rowPattern` is a row: a path and a line
+  count. A relative path is looked up in each of `upstreamRoots`.
+- The hook blocks when: the ledger is missing; a row names a file that does not exist
+  (`requireExisting`); a row's count is not the file's real count (`verifyLines`); fewer than
+  `minEntries` rows; fewer than `minLines` real lines in total; or a word in `mustMention` appears
+  in no row path. The message lists every problem.
+
+Config keys:
+
+- `ledgerFile`: path. Default: `.claude/READ-LEDGER.md`.
+- `upstreamRoots`: list of paths. Default: the project folder.
+- `requireExisting`: boolean. Default: `true`.
+- `verifyLines`: boolean. Default: `true`.
+- `minEntries`: number. Default: `1`.
+- `minLines`: number. Default: `0`.
+- `mustMention`: list of text. Default: none.
+- `codePattern`: regex. Default: common source extensions (`.ts .js .mjs .py .ps1 .rs .go .cs .java .html .css` and more).
+- `exemptPattern`: regex. Default: anything under `.claude/`, and `.md .txt .json .yml .yaml .toml .lock .csv`.
+- `shellWritePattern`: regex. Default: `>` and `>>`, heredocs, `Set-Content`, `Add-Content`, `Out-File`, `tee`, `cp`, `mv`, `Copy-Item`, `Move-Item`, `sed -i`, and `git apply/am/checkout/restore/revert/cherry-pick/merge/rebase/pull`.
+- `rowPattern`: regex with two groups (path, count). Default accepts `- path - 312 lines`, `| path | 312 |`, `path, 312`.
+- `label`: text. Default: the project folder name. `skillName`: text. `nextStep`: text.
+
+```json
+"read-ledger-gate": {
+  "upstreamRoots": ["C:/upstream/wagalo", "C:/upstream/wigolo"],
+  "mustMention": ["wagalo", "wigolo"],
+  "minEntries": 10,
+  "minLines": 2000
+}
+```
+
+A ledger that passes it:
+
+```markdown
+# Read ledger
+- src/lib/wagalo/engines.ts - 1180 lines
+- src/lib/wagalo/ladder.ts - 412 lines
+- wigolo/src/search/core/orchestrator.ts - 1695 lines
+```
+
+### 6.9 measure-gate
+
+No "done" without a fresh number. Added Oct 15, 2026.
+
+- Events: `Stop`. Matcher: none. Timeout: 30.
+- The hook finds the newest receipt (`receiptFile`, or the newest file in `receiptDir` whose name
+  matches `receiptPattern`) and the newest code file under `codeDirs`. If the code is newer, or
+  the receipt does not match `requireMatch`, the turn may not end. The message names both files
+  and their times, and shows `measureCommand`.
+- It gives up after `maxBlocks` blocks in one turn, lets the turn end, and prints a note on stdout
+  saying the receipt is still stale. The turn is the last real user message in the transcript; the
+  count is kept in a small file in the OS temp folder, per session.
+- With no receipt location, or no code files at all, the hook does nothing.
+
+Config keys:
+
+- `receiptFile`: path. Default: none.
+- `receiptDir`: path, with `receiptPattern`: regex (default `.`, every file). Default: none.
+- `requireMatch`: regex. Default: none.
+- `codeDirs`: list of paths. Default: the project folder.
+- `codePattern`: regex. Default: as in 6.8.
+- `ignorePattern`: regex. Default: `.git`, `node_modules`, `vendor`, `third-party`, `.claude`, `dist`, `build`, `coverage`, `__pycache__`, `.venv`, `venv`.
+- `maxDepth`: number. Default: `8`.
+- `maxBlocks`: number. Default: `3`.
+- `measureCommand`: text. Default: none.
+- `label`: text. Default: the project folder name. `hookName`: text. Default: `measure-gate`.
+
+```json
+"measure-gate": {
+  "receiptDir": "work/receipts",
+  "receiptPattern": "^receipt-.*\\.json$",
+  "requireMatch": "\"found\":\\s*\\d+",
+  "codeDirs": ["apps", "packages"],
+  "measureCommand": "node work/measure/run.mjs"
+}
+```
+
 ## 7. Exit codes
 
 The kit's hooks use only two exit codes.
@@ -528,10 +617,10 @@ The kit's hooks use only two exit codes.
 
 What exit 2 does, by hook type:
 
-- **PreToolUse** (`deploy-gate`, `walk-brief-guard`, `db-write-guard`): blocks the tool call. The
+- **PreToolUse** (`deploy-gate`, `walk-brief-guard`, `read-ledger-gate`, `db-write-guard`): blocks the tool call. The
   tool does not run, and Claude sees the message.
-- **Stop** (`no-idle`, `double-check`): blocks the end of the turn. Claude gets one more pass with
-  the message.
+- **Stop** (`no-idle`, `double-check`, `measure-gate`): blocks the end of the turn. Claude gets one more pass with
+  the message. `measure-gate` stops blocking after `maxBlocks` in one turn and prints a note instead.
 - **asyncRewake** (`wake`): wakes Claude with the message. The timer runs in the background, so
   Claude is woken only after the delay.
 - **SessionStart and UserPromptSubmit** (`inject-rules`): the hook never exits 2.
@@ -582,12 +671,12 @@ npm test
 node --test "tests/**/*.test.mjs"
 ```
 
-`npm test` runs the second command. The suite has 77 tests. On Node v24.21.0 on Windows, all 77 pass.
+`npm test` runs the second command. The suite has 94 tests. On Node v24.21.0 on Windows, all 94 pass.
 
 Six hooks have a parity test. It runs the kit hook and the matching script in `reference/` on the
 same input, then compares the exit code and the message. `no-idle` compares only the status words,
-because its hint text comes from config and the reference's is fixed. `double-check` has no
-reference script, so its own test file checks it. The scope tests check the config lookup. The
+because its hint text comes from config and the reference's is fixed. `double-check`, `read-ledger-gate` and `measure-gate` have no
+reference script, so their own test files check them. The scope tests check the config lookup. The
 installer tests use temp folders and never touch the real `~/.claude`.
 
 **Windows note.** Do not run `node --test tests/` with a folder name. On Node v24.21.0 on Windows,
@@ -720,6 +809,32 @@ start a line.
 | `double-check` | `checklist` | list of text | six built-in lines (section 6.6) | The checklist. |
 | `double-check` | `minToolCalls` | number | `0` | Ask only after this many tool calls. |
 | `double-check` | `label` | text | none | Name in the header. |
+| `read-ledger-gate` | `ledgerFile` | path | `.claude/READ-LEDGER.md` | The read ledger. |
+| `read-ledger-gate` | `upstreamRoots` | list of paths | the project folder | Where relative row paths are looked up. |
+| `read-ledger-gate` | `requireExisting` | boolean | `true` | Every row must name a real file. |
+| `read-ledger-gate` | `verifyLines` | boolean | `true` | The stated count must equal the real line count. |
+| `read-ledger-gate` | `minEntries` | number | `1` | Rows needed before code may be written. |
+| `read-ledger-gate` | `minLines` | number | `0` | Real lines read, in total. |
+| `read-ledger-gate` | `mustMention` | list of text | none | Each word must appear in some row path. |
+| `read-ledger-gate` | `codePattern` | regex | built-in (section 6.8) | Paths that count as code. |
+| `read-ledger-gate` | `exemptPattern` | regex | built-in (section 6.8) | Paths never gated. |
+| `read-ledger-gate` | `shellWritePattern` | regex | built-in (section 6.8) | Shell commands that write files. |
+| `read-ledger-gate` | `rowPattern` | regex | built-in (section 6.8) | A ledger row: path, then count. |
+| `read-ledger-gate` | `label` | text | project folder name | Name in the block message. |
+| `read-ledger-gate` | `skillName` | text | none | Prefix on the block message. |
+| `read-ledger-gate` | `nextStep` | text | built-in (section 6.8) | Last line of the block message. |
+| `measure-gate` | `receiptFile` | path | none | One receipt file. |
+| `measure-gate` | `receiptDir` | path | none | Folder of receipts; the newest counts. |
+| `measure-gate` | `receiptPattern` | regex | `.` | Receipt file names. |
+| `measure-gate` | `requireMatch` | regex | none | Text the newest receipt must contain. |
+| `measure-gate` | `codeDirs` | list of paths | the project folder | Folders scanned for code. |
+| `measure-gate` | `codePattern` | regex | built-in (section 6.8) | Paths that count as code. |
+| `measure-gate` | `ignorePattern` | regex | built-in (section 6.9) | Folders never scanned. |
+| `measure-gate` | `maxDepth` | number | `8` | Folder depth scanned. |
+| `measure-gate` | `maxBlocks` | number | `3` | Blocks per turn before giving up. |
+| `measure-gate` | `measureCommand` | text | none | Shown in the block message. |
+| `measure-gate` | `label` | text | project folder name | Name in the block message. |
+| `measure-gate` | `hookName` | text | `measure-gate` | Name in the block message. |
 | `wake` | `minutes` | number | `20` | Delay before the wake-up. |
 | `wake` | `runsDir` | path | none | Folder of worker folders. |
 | `wake` | `minutesFile` | path | `<runsDir>/.rewake-seconds` | Seconds that replace `minutes`. |

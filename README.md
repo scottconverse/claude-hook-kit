@@ -2,7 +2,7 @@
 
 Manual: [docs/MANUAL.md](docs/MANUAL.md) · Landing page: [docs/index.html](docs/index.html)
 
-Seven Claude Code hooks, made per-project: six ported from the hooks Scott ran before the kit, plus `double-check` (added Oct 14, 2026).
+Nine Claude Code hooks, made per-project: six ported from the hooks Scott ran before the kit, plus `double-check` (added Oct 14, 2026) and the two agent-build gates `read-ledger-gate` and `measure-gate` (added Oct 15, 2026).
 
 The hooks Scott runs today live in `~/.claude/settings.json`, so they fire in **every** project.
 Several of them are wired to one project: the rules injector reads one fixed `RULES.md`, the
@@ -31,9 +31,11 @@ So the kit is off everywhere by default. Nothing runs until a project opts in.
 | `hooks/inject-rules.mjs` | SessionStart, UserPromptSubmit | Adds a rules file to every prompt as context. |
 | `hooks/deploy-gate.mjs` | PreToolUse Bash/PowerShell | Blocks a production deploy until a complete gate file exists for the exact commit. |
 | `hooks/walk-brief-guard.mjs` | PreToolUse Write/Edit/Bash/PowerShell | Blocks a walk brief that bans publishing or is missing its required lines and sections. |
+| `hooks/read-ledger-gate.mjs` | PreToolUse Write/Edit/Bash/PowerShell | Blocks any write to a code file until `.claude/READ-LEDGER.md` lists the upstream files that were read, with true line counts. |
 | `hooks/db-write-guard.mjs` | PreToolUse Bash/PowerShell | Keeps a live database read-only: reads pass, writes need a fresh go file. |
 | `hooks/no-idle.mjs` | Stop | Won't let a turn end with finished-but-unhandled workers, a stalled worker, or a running worker and no waiter. |
 | `hooks/double-check.mjs` | Stop | Blocks the first stop of every turn with a check-it-twice list; the second stop goes through, so it never loops. |
+| `hooks/measure-gate.mjs` | Stop | Won't let a turn end while the newest code file is newer than the newest measurement receipt. Gives up after `maxBlocks`, with a note. |
 | `hooks/wake.mjs` | Stop (asyncRewake) | Sleeps, then exits 2 so Claude wakes up with a worker status report. |
 
 ## Config keys
@@ -126,6 +128,65 @@ One example per key. Full working files are in `examples/`.
 - `ownerName` — the owner's name in the go line of the block message, e.g. `"Scott"`. Default: `the owner`.
 - `clientPattern`, `writePattern`, `filePattern`, `restorePattern`, `skipPattern`, `sqlArgPattern`, `portPattern` — optional overrides for the matching rules; the defaults match the current hook.
 - `skillName`, `label`, `explanation` — the project's own words in the block message.
+
+### `read-ledger-gate`
+
+Scott, Oct 15 2026, after Siftwing: three agents in a row were told "read the upstream repos
+first" and none did. The rule lived in a prompt. This hook makes it a gate.
+
+```json
+"read-ledger-gate": {
+  "ledgerFile": ".claude/READ-LEDGER.md",
+  "upstreamRoots": ["C:/Users/me/upstream/wagalo", "C:/Users/me/upstream/wigolo"],
+  "mustMention": ["wagalo", "wigolo"],
+  "minEntries": 10,
+  "minLines": 2000,
+  "label": "mysite"
+}
+```
+
+- A `Write` or `Edit` to a code file, or a shell command that writes one (`>`, heredoc, `Set-Content`,
+  `cp`, `git apply` ...), is blocked until the ledger passes. Docs, `.md`, `.txt`, `.json`, and anything
+  under `.claude/` are never gated.
+- `ledgerFile` - the ledger. One row per file read: `- <path> - <lines> lines`. A table row
+  `| path | 312 |` or `path, 312` also works. Default `.claude/READ-LEDGER.md`.
+- `upstreamRoots` - folders a relative row path is looked up in. Default: the project folder.
+- `requireExisting` (default true) - every row must name a real file. `verifyLines` (default
+  true) - the stated count must equal the file's real line count. A made-up row or a wrong count
+  blocks, and the message names the row.
+- `minEntries` (default 1), `minLines` (default 0) - how much must be read before code is written.
+- `mustMention` - words that must appear in some row path, one per upstream project.
+- `codePattern`, `exemptPattern`, `shellWritePattern`, `rowPattern` - regex overrides; the
+  defaults are in the hook's header comment.
+- `label`, `skillName`, `nextStep` - the project's own words in the block message.
+
+### `measure-gate`
+
+Scott, Oct 15 2026: "every step ends with a number you can read yourself." A turn may not end as
+done while code is newer than the newest measurement receipt.
+
+```json
+"measure-gate": {
+  "receiptDir": "work/receipts",
+  "receiptPattern": "^receipt-.*\\.json$",
+  "requireMatch": "\"found\":\\s*\\d+",
+  "codeDirs": ["apps", "packages"],
+  "measureCommand": "node work/measure/run.mjs",
+  "maxBlocks": 3,
+  "label": "mysite"
+}
+```
+
+- `receiptFile`, or `receiptDir` + `receiptPattern` - where receipts live; the newest one counts.
+  No location set means the hook is off.
+- `requireMatch` - a regex the newest receipt must contain, so an empty file is not a receipt.
+- `codeDirs` (default: the project folder), `codePattern`, `ignorePattern` (default skips
+  `.git`, `node_modules`, `vendor`, `third-party`, `.claude`, `dist`, `build`), `maxDepth` (8).
+- `maxBlocks` (default 3) - a Stop hook that blocks forever would burn tokens forever. After this
+  many blocks in one turn it lets the turn end and prints a note that the receipt is still stale.
+  The turn is identified by the last real user message in the transcript.
+- `measureCommand` - shown in the message so the agent knows what to run.
+- `label`, `hookName` - the project's own words in the block message.
 
 ### `no-idle`
 
@@ -297,7 +358,7 @@ example to read and adapt, not something the installer copies by default.
 node --test "tests/**/*.test.mjs"
 ```
 
-77 tests. Each hook has a parity suite that runs the reference hook and the kit hook on the
+94 tests. Each ported hook has a parity suite that runs the reference hook and the kit hook on the
 same input and compares the exit code and the message, using temp folders for the gate files,
 walk reports, findings list and runs folders. There are also scope tests: with no config every
 hook exits 0 and says nothing, `"enabled": false` switches the kit off, a missing section

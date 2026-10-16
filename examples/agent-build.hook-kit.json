@@ -1,0 +1,33 @@
+{
+  "enabled": true,
+
+  "inject-rules": {
+    "rulesFile": ".claude/RULES.md",
+    "heading": "PROJECT RULES (obey every line, no exceptions):"
+  },
+
+  "read-ledger-gate": {
+    "ledgerFile": ".claude/READ-LEDGER.md",
+    "upstreamRoots": ["C:/Users/me/upstream/project-a", "C:/Users/me/upstream/project-b"],
+    "mustMention": ["project-a", "project-b"],
+    "minEntries": 10,
+    "minLines": 2000,
+    "label": "my project",
+    "nextStep": "Read the upstream code first. Write one ledger row per file you read: `- <path> — <lines> lines`. Then write code."
+  },
+
+  "measure-gate": {
+    "receiptDir": "work/receipts",
+    "receiptPattern": "^receipt-.*\\.json$",
+    "requireMatch": "\"found\":\\s*\\d+",
+    "codeDirs": ["apps", "packages"],
+    "measureCommand": "node work/measure/run.mjs",
+    "maxBlocks": 3,
+    "label": "my project"
+  },
+
+  "double-check": {
+    "quote": "Owner: \"Check everything twice, read everything, do not skim, check the code.\"",
+    "label": "my project"
+  }
+}

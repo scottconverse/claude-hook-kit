@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { HOOKS, makeProject, mkTemp, rimraf, runHook, writeJson, writeText } from "./helpers.mjs";
 
-const ALL = ["inject-rules.mjs", "deploy-gate.mjs", "walk-brief-guard.mjs", "db-write-guard.mjs", "no-idle.mjs", "double-check.mjs", "wake.mjs"];
+const ALL = ["inject-rules.mjs", "deploy-gate.mjs", "walk-brief-guard.mjs", "read-ledger-gate.mjs", "db-write-guard.mjs", "no-idle.mjs", "double-check.mjs", "measure-gate.mjs", "wake.mjs"];
 
 // Inputs that would make each hook block if it were awake. With the kit off, none may.
 const TRIGGERS = {
@@ -15,6 +15,8 @@ const TRIGGERS = {
   "db-write-guard.mjs": JSON.stringify({ tool_name: "Bash", tool_input: { command: 'psql -p 5433 -d townreporter -c "DROP TABLE posts"' } }),
   "no-idle.mjs": JSON.stringify({ hook_event_name: "Stop" }),
   "double-check.mjs": JSON.stringify({ hook_event_name: "Stop" }),
+  "measure-gate.mjs": JSON.stringify({ hook_event_name: "Stop" }),
+  "read-ledger-gate.mjs": JSON.stringify({ tool_name: "Write", tool_input: { file_path: "src/app.ts", content: "x" } }),
   "wake.mjs": JSON.stringify({ hook_event_name: "Stop" }),
 };
 
@@ -60,6 +62,8 @@ test("scope: a config with enabled false switches the whole kit off", async () =
     "walk-brief-guard": { pathPattern: "walk-.*[.]md" },
     "db-write-guard": { port: 5433, databases: ["townreporter"], okFile: path.join(dir, "ok.txt") },
     "no-idle": { runsDir: runs },
+    "read-ledger-gate": {},
+    "measure-gate": { receiptDir: path.join(dir, "receipts") },
     wake: { minutes: 1, runsDir: runs },
   });
   try {

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Seven Claude Code hooks, switched on per project. Each hook stays off until a project adds one config file that turns it on.">
+<meta name="description" content="Nine Claude Code hooks, switched on per project. Each hook stays off until a project adds one config file that turns it on.">
 <title>claude-hook-kit</title>
 <style>
 :root {
@@ -164,7 +164,7 @@ ol.steps li, ul.safe li {
 <header>
   <h1>claude-hook-kit</h1>
   <p class="promise">Guardrails for Claude Code, switched on per project.</p>
-  <p>Seven hooks for Claude Code. Install them once. Each one stays off in every folder until that folder opts in with one config file.</p>
+  <p>Nine hooks for Claude Code. Install them once. Each one stays off in every folder until that folder opts in with one config file.</p>
   <p class="muted">Install once, from a terminal:</p>
   <pre><code>git clone https://github.com/scottconverse/claude-hook-kit
 cd claude-hook-kit
@@ -174,7 +174,7 @@ node install.mjs</code></pre>
 
 <section id="what-you-get">
   <h2>What you get</h2>
-  <p>Seven hooks. Each one has one job.</p>
+  <p>Nine hooks. Each one has one job.</p>
   <div class="cards">
     <article class="card">
       <h3>inject-rules</h3>
@@ -192,6 +192,11 @@ node install.mjs</code></pre>
       <p>Blocks a walk brief that breaks a rule you set, such as a missing required section.</p>
     </article>
     <article class="card">
+      <h3>read-ledger-gate</h3>
+      <p class="event">Event: PreToolUse (Write, Edit, Bash, PowerShell)</p>
+      <p>Blocks any write to a code file until a read ledger lists the upstream files that were read, with true line counts.</p>
+    </article>
+    <article class="card">
       <h3>db-write-guard</h3>
       <p class="event">Event: PreToolUse (Bash, PowerShell)</p>
       <p>Blocks a command that can write to a live database, unless a fresh go file is present.</p>
@@ -205,6 +210,11 @@ node install.mjs</code></pre>
       <h3>double-check</h3>
       <p class="event">Event: Stop</p>
       <p>Blocks the end of a turn once, so Claude re-checks its work against a checklist.</p>
+    </article>
+    <article class="card">
+      <h3>measure-gate</h3>
+      <p class="event">Event: Stop</p>
+      <p>Blocks the end of a turn while the code is newer than the newest measurement receipt. No "done" without a number.</p>
     </article>
     <article class="card">
       <h3>wake</h3>
