@@ -2,18 +2,18 @@
 
 This manual is for a developer who uses Claude Code and has not seen this kit before. It
 covers what the kit does, how to install it, how to turn on a hook in a project, what each of
-the eleven hooks checks, and how to roll back.
+the thirteen hooks checks, and how to roll back.
 
 Contents: [What the kit is](#1-what-the-kit-is) · [Requirements](#2-requirements) ·
 [Install](#3-install) · [Quick start](#4-quick-start-turn-on-double-check) ·
-[How a hook finds its config](#5-how-a-hook-finds-its-config) · [The eleven hooks](#6-the-eleven-hooks) ·
+[How a hook finds its config](#5-how-a-hook-finds-its-config) · [The thirteen hooks](#6-the-thirteen-hooks) ·
 [Exit codes](#7-exit-codes) · [Uninstall and roll back](#8-uninstall-and-roll-back) ·
 [Testing](#9-testing) · [Troubleshooting](#10-troubleshooting) ·
 [Config key reference](#11-config-key-reference)
 
 ## 1. What the kit is
 
-The kit is eleven hook scripts for Claude Code, plus an installer and a per-project config file.
+The kit is thirteen hook scripts for Claude Code, plus an installer, a doctor that checks the install, and a per-project config file.
 The hooks block a few common mistakes: a deploy with no gate, a write to a live database, a walk
 brief that skips a required step, a turn that ends too early, code written before the upstream code
 was read, and a turn that ends "done" with no fresh measurement. The kit is off everywhere until
@@ -43,7 +43,7 @@ The installer does four things:
 2. Backs up `settings.json` to `settings.json.bak-hookkit-<yyyyMMdd-HHmmss>` beside it, if the
    file exists. If that name is taken, it adds `-2`, `-3` and so on, so a backup is never
    overwritten. It prints the path it used.
-3. Merges the kit's eleven hook entries into `settings.json`, creating the file if it is missing.
+3. Merges the kit's fifteen hook entries (thirteen hooks; `inject-rules` and `ran-before-done` each have two events) into `settings.json`, creating the file if it is missing.
    Every other hook and every other setting in the file stays as it was.
 4. Prints what it changed.
 
@@ -69,6 +69,30 @@ Options:
 node install.mjs --dry-run
 node install.mjs --config-dir "D:/claude-config"
 ```
+
+### 3.1 Check the install
+
+```
+node doctor.mjs
+node doctor.mjs --project <folder>
+node doctor.mjs --json
+```
+
+`doctor.mjs` is read-only. It is a port of the hook-liveness check from `scottconverse/fleet-smoke`
+(`reference/fleet-smoke-hook_liveness.py`), extended with what the kit knows about itself. Rows:
+
+- `settings`: `<settings folder>/settings.json` exists and parses.
+- `script`: every registered hook command, kit or not, names a script file that exists. A command whose
+  script path cannot be recognized is `PARTIAL`.
+- `registered`: every kit hook is registered under every event `lib/hook-entries.mjs` says it needs.
+- `liveness`: each installed kit hook is run once with a no-config event in an empty temp folder and must
+  exit 0 and print nothing. If the temp folder sits under a tree that has a config, the row is `PARTIAL`.
+- `project` (with `--project <folder>`): `.claude/hook-kit.json` parses; a section that matches no hook is
+  named; path keys such as `rulesFile`, `ledgerFile`, `gatesDir`, `findingsFile` and `upstreamRoots` must
+  resolve (keys the hooks create themselves, such as `receiptDir`, `stateDir` and `gateDir`, are noted,
+  not failed); `enabled: false` is reported.
+
+Exit 1 when any row is `FAIL`. `--config-dir` chooses the settings folder as for the installer.
 
 ## 4. Quick start: turn on double-check
 
@@ -133,7 +157,7 @@ This walk-through turns on one hook, `double-check`, in one project.
 - A regex string that does not compile turns off the check it belongs to. The hook gives no
   message.
 
-## 6. The eleven hooks
+## 6. The thirteen hooks
 
 | Hook | Event | Matcher | Timeout | What it can do |
 |---|---|---|---|---|
@@ -142,6 +166,8 @@ This walk-through turns on one hook, `double-check`, in one project.
 | `walk-brief-guard` | `PreToolUse` | `Write\|Edit\|Bash\|PowerShell` | 10 | Blocks a walk brief that breaks a required rule. |
 | `read-ledger-gate` | `PreToolUse` | `Write\|Edit\|Bash\|PowerShell` | 15 | Blocks a write to code until the read ledger is complete and true. |
 | `db-write-guard` | `PreToolUse` | `Bash\|PowerShell` | 10 | Blocks a command that can write to a live database. |
+| `command-gate` | `PreToolUse` | `Bash\|PowerShell` | 10 | Blocks a forbidden shell verb (default: kill by name or pattern) and an untagged oversized commit. |
+| `ran-before-done` | `PostToolUse`, `Stop` | `Write\|Edit\|MultiEdit\|NotebookEdit\|Bash\|PowerShell` (PostToolUse) | 10 | Blocks the end of a turn once if runnable code was edited and nothing ever ran. |
 | `no-idle` | `Stop` | none | 30 | Blocks the end of a turn while workers are unattended. |
 | `double-check` | `Stop` | none | 10 | Blocks the end of a turn once, so Claude checks its work. |
 | `measure-gate` | `Stop` | none | 30 | Blocks the end of a turn while code is newer than the newest receipt. |
@@ -668,6 +694,71 @@ Config keys:
 "sprint-gate": { "cap": 25, "label": "my project" }
 ```
 
+### 6.12 command-gate
+
+A forbidden shell command is blocked even when it hides behind a wrapper, a path prefix, a pipeline or
+`sh -c`; an oversized `git commit` without a size tag is blocked. Port of two pieces of
+`scottconverse/hardgate`: `reference/hardgate-gate.py` (tokenizer and nested-shell walk) and
+`reference/hardgate-commit-size-gate.py`.
+
+- Events: `PreToolUse`. Matcher: `Bash|PowerShell`. Timeout: 10.
+- The command is split on `;`, `|`, `&&`, `||` outside quotes. Each part is tokenized with POSIX
+  quoting rules; `sudo`, `env`, `command`, `exec`, `time`, `nohup`, `KEY=value` and path prefixes are
+  stripped; the first token is the verb. A verb rule matches when the verb is listed and, if the rule has
+  `flags`, one of them appears. A pattern rule is a regex on the whole command.
+- `sh`, `bash`, `zsh`, `dash`, `ash`, `ksh` followed by `-c <string>`: the string is walked as a command,
+  one level deeper. Past `maxShellDepth`, or when the inner string cannot be tokenized, the hook blocks
+  (fail closed). An outer command that cannot be tokenized passes, as in the original.
+- Stricter than the original in one place: the original split on operators before tokenizing, so a `;`
+  or `|` inside a quoted `-c` string cut the quote and the parse error passed; and it re-joined nested
+  tokens with spaces, which erased the inner quoting at the third level. The kit blocks all three. The
+  test file records both behaviors.
+- A fresh override marker (modified within `overrideSeconds`) is deleted and grants one pass. A stale
+  marker is deleted and grants nothing.
+- With `commitSize`, a `git commit` with `-m`/`--message` and no `--amend`/`-F` is checked: staged
+  insertions plus deletions from `git diff --cached --numstat` in the event's `cwd`, binary files
+  skipped. Over `maxLines` with no tag matching `tagPattern`: block. Not a git repo: pass.
+
+Config keys:
+
+- `forbidden`: list of rules. Default: the kill-by-name set (`pkill -f`, `pgrep -f`, `killall`, `taskkill /IM|/FI`, `Stop-Process -Name|-ProcessName`, `Get-Process ... | Stop-Process`, `Where-Object ... | Stop-Process`). Setting it replaces the defaults; `[]` turns verb rules off.
+- `blockInlineCode`: boolean. Default: `false`. `true` blocks `python -c`, `node -e`, `perl -e`, `ruby -e`, `php -r`, `deno eval`.
+- `maxShellDepth`: number. Default: `2`.
+- `overrideFile`: path. Default: `.claude/command-gate-override`. `overrideSeconds`: number. Default: `60`.
+- `commitSize`: object or absent. `maxLines` (default `800`), `tagPattern` (default the seven literal tags).
+- `label`: text. Default: the project folder name. `skillName`: text.
+
+```json
+"command-gate": { "label": "my project", "commitSize": { "maxLines": 800 } }
+```
+
+### 6.13 ran-before-done
+
+Runnable code was edited this session and nothing was ever run. Port of
+`plugin/hooks/dev-rigor-ground.js` from `scottconverse/dev-rigor-stack` (`reference/`).
+
+- Events: `PostToolUse` (matcher `Write|Edit|MultiEdit|NotebookEdit|Bash|PowerShell`) and `Stop`.
+  Timeout: 10.
+- `PostToolUse`: an `Edit`, `Write`, `MultiEdit` or `NotebookEdit` whose `file_path` matches
+  `runnablePattern` appends `E<ext>` to `<stateDir>/ran-<session id>.log`. Any other tool that reached the
+  hook appends `X`. Which tools reach the hook is the matcher's decision, so a new execution tool counts
+  without a code change.
+- `Stop`: edits present, no `X`, not yet blocked: append `B`, exit 2. Otherwise exit 0. A stop with
+  `stop_hook_active` exits 0. An event without `session_id` does nothing in either mode.
+- The original kept its ledgers under `CLAUDE_CONFIG_DIR/dev-rigor-plugin/state` and blocked with a JSON
+  `decision` on stdout; the kit keeps them in the project and blocks with exit 2. The parity test compares
+  the decisions.
+
+Config keys:
+
+- `stateDir`: path. Default: `.claude/state`.
+- `runnablePattern`: regex on the edited path. Default: `\.(html?|svg|m?[jt]sx?|cjs|py|ps1|sh|bash|css|scss|vue|svelte|rs|go|c|cc|cpp|h|hpp|java|rb|php|swift|kt|cs)$`, case-insensitive.
+- `label`: text. Default: the project folder name.
+
+```json
+"ran-before-done": { "label": "my project" }
+```
+
 ## 7. Exit codes
 
 The kit's hooks use only two exit codes.
@@ -732,13 +823,17 @@ npm test
 node --test "tests/**/*.test.mjs"
 ```
 
-`npm test` runs the second command. The suite has 109 tests. On Node v24.21.0 on Windows, all 109 pass.
+`npm test` runs the second command. The suite has 128 tests. On Node v24.21.0 on Windows, all 128 pass.
 
 Six hooks have a parity test. It runs the kit hook and the matching script in `reference/` on the
 same input, then compares the exit code and the message. `no-idle` compares only the status words,
 because its hint text comes from config and the reference's is fixed. `double-check`, `read-ledger-gate` and `measure-gate` have no
 reference script, so their own test files check them. `citation-gate` and `sprint-gate` have parity tests
-against `reference/audit-citation-gate.ps1` (needs PowerShell) and `reference/antistall-gate.py` (needs Python). The scope tests check the config lookup. The
+against `reference/audit-citation-gate.ps1` (needs PowerShell) and `reference/antistall-gate.py` (needs Python).
+`command-gate` has parity tests against `reference/hardgate-gate.py` and `reference/hardgate-commit-size-gate.py`
+(Python; the second also needs git) plus one test that pins the three inputs where the kit is stricter than the
+original. `ran-before-done` replays one tool sequence through `reference/dev-rigor-ground.js` and the kit. The
+doctor has its own tests in a temp settings folder. The scope tests check the config lookup. The
 installer tests use temp folders and never touch the real `~/.claude`.
 
 **Windows note.** Do not run `node --test tests/` with a folder name. On Node v24.21.0 on Windows,
@@ -746,6 +841,8 @@ that fails with `MODULE_NOT_FOUND` before any test runs. Use the quoted glob sho
 `node --test` from inside `tests/`.
 
 ## 10. Troubleshooting
+
+Run `node doctor.mjs --project <folder>` first (section 3.1). It names the missing registration, the missing script, or the config key that does not resolve.
 
 **A hook does nothing.** Check these, in order. Each one turns a hook off with no message.
 
@@ -907,6 +1004,17 @@ start a line.
 | `sprint-gate` | `honorStopHookActive` | boolean | `false` | Let a continuation stop through. |
 | `sprint-gate` | `secretFile` | path | see section 6.11 | PBKDF2 record of the release passphrase. |
 | `sprint-gate` | `label` | text | project folder name | Name in messages. |
+| `command-gate` | `forbidden` | list | kill-by-name rules (section 6.12) | `{ verbs, flags, message }` or `{ pattern, message }`. Replaces the defaults. |
+| `command-gate` | `blockInlineCode` | boolean | `false` | Also block `python -c`, `node -e` and the like. |
+| `command-gate` | `maxShellDepth` | number | `2` | Nested `sh -c` levels walked before failing closed. |
+| `command-gate` | `overrideFile` | path | `.claude/command-gate-override` | One-shot human bypass marker. |
+| `command-gate` | `overrideSeconds` | number | `60` | How fresh the marker must be. |
+| `command-gate` | `commitSize` | object | none (off) | `maxLines` (`800`), `tagPattern` (seven literal tags). |
+| `command-gate` | `label` | text | project folder name | Name in messages. |
+| `command-gate` | `skillName` | text | none | Prefix on the block message. |
+| `ran-before-done` | `stateDir` | path | `.claude/state` | Folder of per-session ledgers. |
+| `ran-before-done` | `runnablePattern` | regex | source and view extensions (section 6.13) | Which edited paths count. |
+| `ran-before-done` | `label` | text | project folder name | Name in messages. |
 | `wake` | `minutes` | number | `20` | Delay before the wake-up. |
 | `wake` | `runsDir` | path | none | Folder of worker folders. |
 | `wake` | `minutesFile` | path | `<runsDir>/.rewake-seconds` | Seconds that replace `minutes`. |

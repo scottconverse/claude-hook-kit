@@ -31,6 +31,16 @@
     "label": "my project"
   },
 
+  "command-gate": {
+    "label": "my project",
+    "commitSize": { "maxLines": 800 }
+  },
+
+  "ran-before-done": {
+    "stateDir": ".claude/state",
+    "label": "my project"
+  },
+
   "double-check": {
     "quote": "Owner: \"Check everything twice, read everything, do not skim, check the code.\"",
     "label": "my project"

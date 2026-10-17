@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { HOOKS, makeProject, mkTemp, rimraf, runHook, writeJson, writeText } from "./helpers.mjs";
 
-const ALL = ["inject-rules.mjs", "deploy-gate.mjs", "walk-brief-guard.mjs", "read-ledger-gate.mjs", "db-write-guard.mjs", "no-idle.mjs", "double-check.mjs", "measure-gate.mjs", "citation-gate.mjs", "sprint-gate.mjs", "wake.mjs"];
+const ALL = ["inject-rules.mjs", "deploy-gate.mjs", "walk-brief-guard.mjs", "read-ledger-gate.mjs", "db-write-guard.mjs", "command-gate.mjs", "ran-before-done.mjs", "no-idle.mjs", "double-check.mjs", "measure-gate.mjs", "citation-gate.mjs", "sprint-gate.mjs", "wake.mjs"];
 
 // Inputs that would make each hook block if it were awake. With the kit off, none may.
 const TRIGGERS = {
@@ -18,6 +18,8 @@ const TRIGGERS = {
   "measure-gate.mjs": JSON.stringify({ hook_event_name: "Stop" }),
   "citation-gate.mjs": JSON.stringify({ hook_event_name: "Stop" }),
   "sprint-gate.mjs": JSON.stringify({ hook_event_name: "Stop", session_id: "s" }),
+  "command-gate.mjs": JSON.stringify({ tool_name: "Bash", tool_input: { command: "pkill -f node" } }),
+  "ran-before-done.mjs": JSON.stringify({ hook_event_name: "Stop", session_id: "s" }),
   "read-ledger-gate.mjs": JSON.stringify({ tool_name: "Write", tool_input: { file_path: "src/app.ts", content: "x" } }),
   "wake.mjs": JSON.stringify({ hook_event_name: "Stop" }),
 };
@@ -68,6 +70,8 @@ test("scope: a config with enabled false switches the whole kit off", async () =
     "measure-gate": { receiptDir: path.join(dir, "receipts") },
     "citation-gate": {},
     "sprint-gate": {},
+    "command-gate": {},
+    "ran-before-done": {},
     wake: { minutes: 1, runsDir: runs },
   });
   try {

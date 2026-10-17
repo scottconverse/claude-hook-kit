@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "license": "MIT",
-  "description": "Per-project config for eleven Claude Code hooks",
+  "description": "Per-project config for thirteen Claude Code hooks",
   "type": "module",
   "scripts": {
     "test": "node --test \"tests/**/*.test.mjs\""

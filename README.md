@@ -2,7 +2,7 @@
 
 Manual: [docs/MANUAL.md](docs/MANUAL.md) · Landing page: [docs/index.html](docs/index.html)
 
-Eleven Claude Code hooks, made per-project: six ported from the hooks Scott ran before the kit, plus `double-check` (added Oct 14, 2026), the two agent-build gates `read-ledger-gate` and `measure-gate` (added Oct 15, 2026), and two ports from the wider guardrail family, `citation-gate` and `sprint-gate` (added Oct 17, 2026).
+Thirteen Claude Code hooks, made per-project: six ported from the hooks Scott ran before the kit, plus `double-check` (added Oct 14, 2026), the two agent-build gates `read-ledger-gate` and `measure-gate` (added Oct 15, 2026), and four ports from the wider guardrail family, `citation-gate`, `sprint-gate`, `command-gate` and `ran-before-done` (added Oct 17, 2026). `node doctor.mjs` checks that the install is live.
 
 The hooks Scott runs today live in `~/.claude/settings.json`, so they fire in **every** project.
 Several of them are wired to one project: the rules injector reads one fixed `RULES.md`, the
@@ -10,7 +10,7 @@ watchdog hooks read one fixed `runs` folder, and the guards match TownReporter c
 and port 5433 by name. This kit keeps the same behavior but moves every project-specific value
 into a small config file, so a hook is active only where a project asks for it.
 
-Read `reference/` for the originals this was ported from: the six TownReporter hooks, `audit-citation-gate.ps1`, and AntiStallClaude's `antistall-gate.py` + `antistall.py`. They are the spec.
+Read `reference/` for the originals this was ported from: the six TownReporter hooks, `audit-citation-gate.ps1`, AntiStallClaude's `antistall-gate.py` + `antistall.py`, hardgate's `gate.py` + `commit-size-gate.py`, dev-rigor-stack's `dev-rigor-ground.js`, and fleet-smoke's `hook_liveness.py`. They are the spec.
 
 ## How a hook finds its project
 
@@ -33,6 +33,8 @@ So the kit is off everywhere by default. Nothing runs until a project opts in.
 | `hooks/walk-brief-guard.mjs` | PreToolUse Write/Edit/Bash/PowerShell | Blocks a walk brief that bans publishing or is missing its required lines and sections. |
 | `hooks/read-ledger-gate.mjs` | PreToolUse Write/Edit/Bash/PowerShell | Blocks any write to a code file until `.claude/READ-LEDGER.md` lists the upstream files that were read, with true line counts. |
 | `hooks/db-write-guard.mjs` | PreToolUse Bash/PowerShell | Keeps a live database read-only: reads pass, writes need a fresh go file. |
+| `hooks/command-gate.mjs` | PreToolUse Bash/PowerShell | Blocks forbidden shell verbs even behind `sudo`, a path prefix, a pipeline or `sh -c`. Default rules: never kill a process by name or pattern. Optional commit-size gate. |
+| `hooks/ran-before-done.mjs` | PostToolUse + Stop | Records edits to runnable files and tool calls that ran anything; blocks the stop once if code was edited and nothing ever ran. |
 | `hooks/no-idle.mjs` | Stop | Won't let a turn end with finished-but-unhandled workers, a stalled worker, or a running worker and no waiter. |
 | `hooks/double-check.mjs` | Stop | Blocks the first stop of every turn with a check-it-twice list; the second stop goes through, so it never loops. |
 | `hooks/measure-gate.mjs` | Stop | Won't let a turn end while the newest code file is newer than the newest measurement receipt. Gives up after `maxBlocks`, with a note. |
@@ -240,6 +242,57 @@ Port of `scottconverse/AntiStallClaude` v0.3.2. The agent can arm a sprint and c
   record format), else `~/.claude/sprint-release.hash`. `SPRINT_RELEASE` / `ANTISTALL_RELEASE` env
   bypasses the dialog for non-interactive human use.
 
+### `command-gate`
+
+Port of two pieces of `scottconverse/hardgate`: the tokenizer and nested-shell walk from its `gate.py`
+template, and `commit-size-gate.py`. Scott, Oct 12, 2026: a `Stop-Process` filter on a command-line
+pattern killed 31 node services. The default rule set is that rule.
+
+```json
+"command-gate": {
+  "label": "mysite",
+  "commitSize": { "maxLines": 800 }
+}
+```
+
+- Default `forbidden` rules: `pkill -f`, `pgrep -f`, `killall`, `taskkill /IM` or `/FI`, `Stop-Process -Name`
+  (and `kill`/`spps` aliases), `Get-Process ... | Stop-Process`, `Where-Object ... | Stop-Process`. Killing one
+  PID (`kill 4242`, `taskkill /PID`, `Stop-Process -Id`) passes.
+- A rule is `{ "verbs": [...], "flags": [...], "message": "..." }` (verb matches after stripping `sudo`, `env`,
+  `KEY=value` and path prefixes; flags, when given, must appear) or `{ "pattern": "<regex>", "message": "..." }`
+  on the whole command. Setting `forbidden` replaces the defaults; `[]` turns verb rules off.
+- Pipelines are split on `;`, `|`, `&&`, `||` outside quotes. A `sh -c "<string>"` argument is walked as a
+  command string, down to `maxShellDepth` (2); deeper, or unparseable inside `-c`, fails closed. An
+  unparseable outer command fails open, as the original (the shell would reject it anyway).
+- `blockInlineCode: true` also blocks `python -c`, `node -e`, `perl -e`, `ruby -e`, `php -r`, `deno eval`
+  outright, as the hardgate original did.
+- `commitSize` (absent = off): `git commit -m "<msg>"` is blocked when the staged diff, from
+  `git diff --cached --numstat` in the event's `cwd`, exceeds `maxLines` and the message carries no literal
+  tag matching `tagPattern` (default `[MVP]`, `[LARGE-CHANGE]`, `[REFACTOR]`, `[INITIAL]`, `[MERGE]`,
+  `[REVERT]`, `[SCOPE-EXPANSION: <reason>]`). `--amend`, `-F` and editor commits are not parseable here and pass.
+- Human override: touch `overrideFile` (default `.claude/command-gate-override`); the next gated command
+  within `overrideSeconds` (60) runs once and the marker is deleted. A stale marker is deleted and grants nothing.
+
+### `ran-before-done`
+
+Port of `plugin/hooks/dev-rigor-ground.js` from `scottconverse/dev-rigor-stack`. You edited runnable code
+and never ran anything.
+
+```json
+"ran-before-done": {
+  "stateDir": ".claude/state",
+  "label": "mysite"
+}
+```
+
+- PostToolUse on `Write|Edit|MultiEdit|NotebookEdit|Bash|PowerShell`: an edit to a file matching
+  `runnablePattern` (source and view extensions by default) appends `E<ext>` to a per-session ledger
+  `<stateDir>/ran-<session id>.log`; any other tool that reached the hook appends `X`. The matcher decides
+  what counts as execution, not a list inside the hook.
+- Stop: if the ledger has edits and zero `X`, block once (exit 2) and record `B`. The next stop passes. A
+  continuation stop (`stop_hook_active`) passes. No `session_id` in the event: record nothing, block nothing.
+- Deliberate floor: it catches the case where nothing ever ran. `measure-gate` covers "is the receipt fresh".
+
 ### `no-idle`
 
 ```json
@@ -359,6 +412,20 @@ node init-project.mjs <projectDir> --example townreporter
 It copies one of the files in `examples/`, and refuses to overwrite an existing config unless
 you pass `--force`.
 
+### Check the install
+
+```
+node doctor.mjs
+node doctor.mjs --project <folder>
+```
+
+Port of fleet-smoke's hook-liveness check. Read-only. It parses `settings.json`, checks that every registered
+hook command (kit or not) points at a file that exists, that every kit hook is registered under its event,
+and runs each installed kit hook once with a no-config event in an empty temp folder, expecting exit 0 and
+silence. With `--project` it also parses that folder's `.claude/hook-kit.json`, names sections that match no
+hook, and checks that path keys such as `rulesFile` resolve. One line per row, `PASS`, `FAIL` or `PARTIAL`;
+`--json` for machines; exit 1 when any row is `FAIL`. `--config-dir` as for the installer.
+
 ### Turning a hook on or off
 
 Edit that project's `.claude/hook-kit.json`. The keys are described above under **Config keys**;
@@ -410,7 +477,7 @@ example to read and adapt, not something the installer copies by default.
 node --test "tests/**/*.test.mjs"
 ```
 
-109 tests. Each ported hook has a parity suite that runs the reference hook and the kit hook on the
+128 tests. Each ported hook has a parity suite that runs the reference hook and the kit hook on the
 same input and compares the exit code and the message, using temp folders for the gate files,
 walk reports, findings list and runs folders. There are also scope tests: with no config every
 hook exits 0 and says nothing, `"enabled": false` switches the kit off, a missing section
@@ -424,6 +491,13 @@ refuses to overwrite. Every case uses a temp settings folder and never touches t
 `~/.claude`:
 
 `npm test` runs the same command.
+
+`tests/command-gate.test.mjs` runs the kit against `reference/hardgate-gate.py` (needs Python) and
+`reference/hardgate-commit-size-gate.py` (Python and git, in a temp repo). One test records where the kit is
+stricter than the original: a `;` or `|` inside a quoted `-c` string, and a third nesting level, all pass
+the original and are blocked by the kit. `tests/ran-before-done.test.mjs` replays one tool sequence through
+the kit and `reference/dev-rigor-ground.js` and compares the block decisions. `tests/doctor.test.mjs` builds
+a temp settings folder with the kit installed and checks every row the doctor can print.
 
 **Note on the runner.** The kit was checked with `node --test "tests/**/*.test.mjs"`. The
 shorter `node --test tests/` does not work on this Node build (v24.21.0 on Windows): Node

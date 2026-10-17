@@ -35,6 +35,11 @@
             "type": "command",
             "command": "node \"<HOOK_KIT_DIR>/hooks/db-write-guard.mjs\"",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "node \"<HOOK_KIT_DIR>/hooks/command-gate.mjs\"",
+            "timeout": 10
           }
         ]
       },
@@ -50,6 +55,18 @@
             "type": "command",
             "command": "node \"<HOOK_KIT_DIR>/hooks/read-ledger-gate.mjs\"",
             "timeout": 15
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"<HOOK_KIT_DIR>/hooks/ran-before-done.mjs\"",
+            "timeout": 10
           }
         ]
       }
@@ -81,6 +98,11 @@
             "type": "command",
             "command": "node \"<HOOK_KIT_DIR>/hooks/sprint-gate.mjs\"",
             "timeout": 15
+          },
+          {
+            "type": "command",
+            "command": "node \"<HOOK_KIT_DIR>/hooks/ran-before-done.mjs\"",
+            "timeout": 10
           },
           {
             "type": "command",
