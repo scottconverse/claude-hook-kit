@@ -9,262 +9,157 @@
 :root {
   color-scheme: light dark;
   --bg: #ffffff;
-  --text: #1b1f24;
+  --panel: #f3f5f8;
+  --ink: #1b1f24;
   --muted: #3d4650;
+  --line: #cfd6de;
   --accent: #1a56b8;
-  --card-bg: #f3f5f8;
-  --edge: #7a8491;
-  --code-bg: #eceff3;
-  --code-text: #14181e;
+  --accent-ink: #ffffff;
+  --warn: #b7791f;
+  --code-bg: #0f1620;
+  --code-ink: #e7edf3;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #111418;
-    --text: #eef1f5;
-    --muted: #c3cad4;
-    --accent: #9cc2ff;
-    --card-bg: #1a1f26;
-    --edge: #6b7584;
-    --code-bg: #0a0c0f;
-    --code-text: #e8ecf1;
+    --bg: #0e141b;
+    --panel: #172330;
+    --ink: #edf3f8;
+    --muted: #afc1ce;
+    --line: #334958;
+    --accent: #7fb3ff;
+    --accent-ink: #0b1f3a;
+    --warn: #ffcf82;
+    --code-bg: #091119;
+    --code-ink: #e7edf3;
   }
 }
-
 * { box-sizing: border-box; }
-
-body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--text);
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-  font-size: 18px;
-  line-height: 1.6;
-}
-
-.wrap {
-  max-width: 46rem;
-  margin: 0 auto;
-  padding: 0 16px;
-}
-
-header, section, footer {
-  padding: 32px 0;
-}
-header { padding-top: 40px; }
-section + section { border-top: 2px solid var(--edge); }
-footer { border-top: 2px solid var(--edge); color: var(--muted); }
-
-h1, h2, h3 {
-  line-height: 1.6;
-  overflow-wrap: anywhere;
-}
-h1 {
-  font-size: 2.25rem;
-  margin: 0 0 8px;
-}
-h2 {
-  font-size: 1.75rem;
-  margin: 0 0 16px;
-}
-h3 {
-  font-size: 1.25rem;
-  margin: 0 0 4px;
-}
-@media (min-width: 40rem) {
-  h1 { font-size: 2.75rem; }
-}
-
-p {
-  margin: 0 0 16px;
-}
-.promise {
-  font-size: 1.375rem;
-  font-weight: 600;
-  margin: 0 0 16px;
-}
-.muted {
-  color: var(--muted);
-}
-
-a {
-  color: var(--accent);
-  text-decoration-thickness: 2px;
-  text-underline-offset: 3px;
-  overflow-wrap: anywhere;
-}
-a:focus-visible {
-  outline: 3px solid var(--accent);
-  outline-offset: 3px;
-}
-
-code, pre {
-  font-family: ui-monospace, Consolas, monospace;
-  font-size: 1em;
-}
-code {
-  background: var(--code-bg);
-  color: var(--code-text);
-  border-radius: 4px;
-  padding: 0 4px;
-  overflow-wrap: anywhere;
-}
-pre {
-  background: var(--code-bg);
-  color: var(--code-text);
-  border-radius: 8px;
-  padding: 16px;
-  margin: 0 0 16px;
-  max-width: 100%;
-  overflow-x: auto;
-  white-space: pre;
-}
-pre code {
-  background: none;
-  padding: 0;
-  overflow-wrap: normal;
-  white-space: pre;
-}
-
-.cards {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 16px;
-}
-@media (min-width: 40rem) {
-  .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-.card {
-  background: var(--card-bg);
-  border: 2px solid var(--edge);
-  border-radius: 8px;
-  padding: 16px;
-  margin: 0;
-  min-width: 0;
-}
-.card p {
-  margin: 0;
-}
-.card .event {
-  color: var(--muted);
-  margin: 0 0 8px;
-}
-
-ol.steps, ul.safe {
-  padding-left: 1.5em;
-  margin: 0;
-}
-ol.steps li, ul.safe li {
-  margin-bottom: 12px;
+body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.65 system-ui, -apple-system, "Segoe UI", sans-serif; }
+a { color: var(--accent); text-underline-offset: 4px; }
+a:focus-visible { outline: 3px solid var(--warn); outline-offset: 5px; }
+header, main, footer { max-width: 1080px; margin: auto; padding: 24px; }
+header { display: flex; justify-content: space-between; gap: 20px; align-items: center; border-bottom: 1px solid var(--line); }
+nav { display: flex; gap: 20px; flex-wrap: wrap; }
+.brand { font-weight: 750; color: var(--ink); text-decoration: none; }
+.hero { padding: 70px 0 32px; }
+.eyebrow { color: var(--accent); font-size: 13px; letter-spacing: .15em; text-transform: uppercase; font-weight: 600; }
+h1 { font-size: clamp(36px, 6vw, 65px); letter-spacing: -.045em; line-height: 1.08; max-width: 850px; margin: 14px 0 25px; }
+h2 { font-size: 29px; line-height: 1.25; margin: 48px 0 18px; }
+h3 { font-size: 20px; margin: 0 0 8px; }
+p { max-width: 800px; }
+.lead { font-size: 21px; color: var(--muted); }
+.actions { display: flex; gap: 16px; flex-wrap: wrap; margin: 28px 0; }
+.button { border: 1px solid var(--accent); padding: 9px 18px; border-radius: 7px; text-decoration: none; }
+.button.primary { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
+.note { border-left: 4px solid var(--warn); background: var(--panel); padding: 15px 20px; max-width: none; }
+.grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 9px; padding: 22px; }
+.card p { margin: 0; color: var(--muted); font-size: 16px; }
+.card h3 code { font-size: 17px; }
+.tag { display: block; margin-bottom: 10px; color: var(--accent); font: 600 12px/1.4 ui-monospace, Consolas, monospace; letter-spacing: .08em; }
+pre { background: var(--code-bg); color: var(--code-ink); border: 1px solid var(--line); padding: 22px; overflow: auto; border-radius: 8px; font-size: 14px; line-height: 1.5; }
+code { font-family: ui-monospace, Consolas, monospace; }
+p code, li code { background: var(--panel); padding: 1px 6px; border-radius: 4px; font-size: 15px; }
+pre code { background: none; padding: 0; font-size: inherit; }
+ol.steps li, ul.safe li { margin: 8px 0; }
+footer { border-top: 1px solid var(--line); margin-top: 60px; color: var(--muted); font-size: 14px; }
+@media (max-width: 760px) {
+  header { display: block; }
+  nav { margin-top: 14px; }
+  .grid { grid-template-columns: 1fr; }
+  .hero { padding-top: 40px; }
+  h1 { font-size: 40px; }
 }
 </style>
 </head>
 <body>
-<div class="wrap">
-
 <header>
-  <h1>claude-hook-kit</h1>
-  <p class="promise">Guardrails for Claude Code, switched on per project.</p>
-  <p>Nine hooks for Claude Code. Install them once. Each one stays off in every folder until that folder opts in with one config file.</p>
-  <p class="muted">Install once, from a terminal:</p>
-  <pre><code>git clone https://github.com/scottconverse/claude-hook-kit
-cd claude-hook-kit
-node install.mjs</code></pre>
-  <p>Needs Node.js. No npm packages.</p>
+  <a class="brand" href="#">claude-hook-kit</a>
+  <nav aria-label="Main">
+    <a href="#hooks">Hooks</a>
+    <a href="#start">Setup</a>
+    <a href="MANUAL.md">Manual</a>
+    <a href="https://github.com/scottconverse/claude-hook-kit">GitHub</a>
+  </nav>
 </header>
+<main>
+  <section class="hero">
+    <div class="eyebrow">Scott Converse · Claude Code · MIT</div>
+    <h1>Rules that hold<br>because a hook enforces them.</h1>
+    <p class="lead">Nine Claude Code hooks, switched on per project. A rule written in a prompt can be skipped. A hook that returns exit 2 cannot. Install once; each hook stays off in every folder until that folder opts in with one config file.</p>
+    <div class="actions">
+      <a class="button primary" href="MANUAL.md">Read the manual</a>
+      <a class="button" href="https://github.com/scottconverse/claude-hook-kit">Source on GitHub</a>
+    </div>
+  </section>
 
-<section id="what-you-get">
-  <h2>What you get</h2>
-  <p>Nine hooks. Each one has one job.</p>
-  <div class="cards">
-    <article class="card">
-      <h3>inject-rules</h3>
-      <p class="event">Event: SessionStart, UserPromptSubmit</p>
-      <p>Adds your project's rules file to Claude's context. It never blocks anything.</p>
-    </article>
-    <article class="card">
-      <h3>deploy-gate</h3>
-      <p class="event">Event: PreToolUse (Bash, PowerShell)</p>
-      <p>Blocks a deploy command until a gate file for the commit passes its checks.</p>
-    </article>
-    <article class="card">
-      <h3>walk-brief-guard</h3>
-      <p class="event">Event: PreToolUse (Write, Edit, Bash, PowerShell)</p>
-      <p>Blocks a walk brief that breaks a rule you set, such as a missing required section.</p>
-    </article>
-    <article class="card">
-      <h3>read-ledger-gate</h3>
-      <p class="event">Event: PreToolUse (Write, Edit, Bash, PowerShell)</p>
-      <p>Blocks any write to a code file until a read ledger lists the upstream files that were read, with true line counts.</p>
-    </article>
-    <article class="card">
-      <h3>db-write-guard</h3>
-      <p class="event">Event: PreToolUse (Bash, PowerShell)</p>
-      <p>Blocks a command that can write to a live database, unless a fresh go file is present.</p>
-    </article>
-    <article class="card">
-      <h3>no-idle</h3>
-      <p class="event">Event: Stop</p>
-      <p>Blocks the end of a turn while background workers are left unattended.</p>
-    </article>
-    <article class="card">
-      <h3>double-check</h3>
-      <p class="event">Event: Stop</p>
-      <p>Blocks the end of a turn once, so Claude re-checks its work against a checklist.</p>
-    </article>
-    <article class="card">
-      <h3>measure-gate</h3>
-      <p class="event">Event: Stop</p>
-      <p>Blocks the end of a turn while the code is newer than the newest measurement receipt. No "done" without a number.</p>
-    </article>
-    <article class="card">
-      <h3>wake</h3>
-      <p class="event">Event: Stop (runs in the background)</p>
-      <p>After a delay, 20 minutes by default, wakes Claude with a status list of its workers.</p>
-    </article>
-  </div>
-</section>
+  <p class="note"><strong>Verified boundary:</strong> every hook is tested by running it as a child process with a real hook event (94 tests, Node 24 on Windows). A read ledger proves that files exist with the stated line counts, not that the code was understood or reused. A fresh receipt proves freshness, not a true result. <code>measure-gate</code> gives up after a set number of blocks so it can never loop forever.</p>
 
-<section id="how-it-works">
-  <h2>How it works</h2>
-  <ol class="steps">
-    <li><strong>Install once.</strong> Run <code>node install.mjs</code>. It adds the hooks to your Claude Code settings and backs up the settings file first.</li>
-    <li><strong>Opt in per project.</strong> Add <code>.claude/hook-kit.json</code> to the project folder. List only the hooks you want, with their settings.</li>
-    <li><strong>Hooks run only there.</strong> A hook looks for that file in its own folder, then in each folder above it. The nearest file wins. No file means no effect.</li>
-  </ol>
-</section>
+  <section id="hooks">
+    <h2>The nine hooks</h2>
+    <p>Each one has one job. The ones labelled <em>before tool use</em> block a tool call. The ones labelled <em>turn end</em> block the end of a turn.</p>
+    <div class="grid">
+      <article class="card"><span class="tag">CONTEXT</span><h3><code>inject-rules</code></h3><p>Adds your project's rules file to Claude's context at session start and with every prompt. Never blocks.</p></article>
+      <article class="card"><span class="tag">BEFORE TOOL USE</span><h3><code>deploy-gate</code></h3><p>Blocks a deploy command until a gate file for the exact commit passes its checks.</p></article>
+      <article class="card"><span class="tag">BEFORE TOOL USE</span><h3><code>walk-brief-guard</code></h3><p>Blocks a walk brief that breaks a rule you set, such as a missing required section.</p></article>
+      <article class="card"><span class="tag">BEFORE TOOL USE</span><h3><code>read-ledger-gate</code></h3><p>Blocks any write to a code file until a read ledger lists the upstream files that were read, with true line counts.</p></article>
+      <article class="card"><span class="tag">BEFORE TOOL USE</span><h3><code>db-write-guard</code></h3><p>Blocks a command that can write to a live database, unless a fresh go file is present.</p></article>
+      <article class="card"><span class="tag">TURN END</span><h3><code>no-idle</code></h3><p>Blocks the end of a turn while background workers are left unattended.</p></article>
+      <article class="card"><span class="tag">TURN END</span><h3><code>double-check</code></h3><p>Blocks the end of a turn once, so Claude re-checks its work against a checklist. The second stop goes through.</p></article>
+      <article class="card"><span class="tag">TURN END</span><h3><code>measure-gate</code></h3><p>Blocks the end of a turn while the code is newer than the newest measurement receipt. No "done" without a number.</p></article>
+      <article class="card"><span class="tag">BACKGROUND</span><h3><code>wake</code></h3><p>After a delay, 20 minutes by default, wakes Claude with a status list of its workers.</p></article>
+    </div>
+  </section>
 
-<section id="example">
-  <h2>Example config</h2>
-  <p>This is the <code>double-check</code> section from <code>examples/minimal.hook-kit.json</code>. Put it in <code>.claude/hook-kit.json</code> to turn that hook on in one project.</p>
-  <pre><code>{
-  "double-check": {
-    "quote": "Owner: \"Check everything twice, read everything, do not skim, check the code.\"",
-    "label": "my project"
+  <section id="start">
+    <h2>Install once. Opt in per project.</h2>
+    <p>Needs Node.js 18 or newer. No npm packages. The installer backs up your settings file first, never duplicates entries, and leaves every other hook alone.</p>
+    <pre><code>git clone https://github.com/scottconverse/claude-hook-kit
+cd claude-hook-kit
+node install.mjs
+node init-project.mjs C:/dev/my-project --example agent-build</code></pre>
+    <ol class="steps">
+      <li><strong>Install once.</strong> <code>node install.mjs</code> copies the hooks to <code>~/.claude/hook-kit/</code> and registers them in <code>~/.claude/settings.json</code>.</li>
+      <li><strong>Opt in per project.</strong> Add <code>.claude/hook-kit.json</code> to the project folder. List only the hooks you want, with their settings.</li>
+      <li><strong>Hooks run only there.</strong> A hook looks for that file in its own folder, then in each folder above it. The nearest file wins. No file means no effect.</li>
+    </ol>
+  </section>
+
+  <section id="example">
+    <h2>Example: the two agent-build gates</h2>
+    <p>From <code>examples/agent-build.hook-kit.json</code>. No code before the upstream code was read; no "done" before a fresh measurement.</p>
+    <pre><code>{
+  "read-ledger-gate": {
+    "upstreamRoots": ["C:/upstream/project-a", "C:/upstream/project-b"],
+    "mustMention": ["project-a", "project-b"],
+    "minEntries": 10,
+    "minLines": 2000
+  },
+  "measure-gate": {
+    "receiptDir": "work/receipts",
+    "receiptPattern": "^receipt-.*\\.json$",
+    "measureCommand": "node work/measure/run.mjs",
+    "maxBlocks": 3
   }
 }</code></pre>
-</section>
+  </section>
 
-<section id="safe-by-default">
-  <h2>Safe by default</h2>
-  <ul class="safe">
-    <li>Off until opted in. A hook does nothing in a folder with no config file, or with no section for that hook.</li>
-    <li>The installer backs up your settings file before it changes it.</li>
-    <li>It never duplicates entries. Running the installer again replaces the kit's own entries.</li>
-    <li>Uninstall removes only the kit's entries. Your other hooks stay.</li>
-    <li>No npm dependencies. The kit uses Node.js and its built-in modules.</li>
-  </ul>
-</section>
-
-<section id="read-more">
-  <h2>Read more</h2>
-  <p><a href="MANUAL.md">Read the manual</a>: install, quick start, every hook, and every config key.</p>
-  <p><a href="https://github.com/scottconverse/claude-hook-kit">Source on GitHub</a></p>
-</section>
-
+  <section id="safe">
+    <h2>Safe by default</h2>
+    <ul class="safe">
+      <li>Off until opted in. A hook does nothing in a folder with no config file, or with no section for that hook.</li>
+      <li>The installer backs up <code>settings.json</code> before it changes it, and prints the backup path.</li>
+      <li>Running the installer again replaces the kit's own entries. It never duplicates them.</li>
+      <li>Uninstall removes only the kit's entries. Your other hooks stay.</li>
+      <li>Two exit codes only: 0 lets the action through, 2 blocks it with a message Claude can read.</li>
+    </ul>
+    <p>A sibling kit for Codex, with the same project conventions: <a href="https://scottconverse.github.io/codex-hook-kit/">codex-hook-kit</a>.</p>
+  </section>
+</main>
 <footer>
-  <p><a href="../LICENSE">MIT License</a> · <a href="https://github.com/scottconverse/claude-hook-kit">GitHub</a></p>
+  <a href="https://github.com/scottconverse/claude-hook-kit/blob/main/LICENSE">MIT</a> © 2026 Scott Converse ·
+  <a href="MANUAL.md">Manual</a> ·
+  <a href="https://github.com/scottconverse/claude-hook-kit">GitHub</a>
 </footer>
-
-</div>
 </body>
 </html>
