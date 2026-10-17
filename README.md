@@ -2,7 +2,7 @@
 
 Manual: [docs/MANUAL.md](docs/MANUAL.md) · Landing page: [docs/index.html](docs/index.html)
 
-Nine Claude Code hooks, made per-project: six ported from the hooks Scott ran before the kit, plus `double-check` (added Oct 14, 2026) and the two agent-build gates `read-ledger-gate` and `measure-gate` (added Oct 15, 2026).
+Eleven Claude Code hooks, made per-project: six ported from the hooks Scott ran before the kit, plus `double-check` (added Oct 14, 2026), the two agent-build gates `read-ledger-gate` and `measure-gate` (added Oct 15, 2026), and two ports from the wider guardrail family, `citation-gate` and `sprint-gate` (added Oct 17, 2026).
 
 The hooks Scott runs today live in `~/.claude/settings.json`, so they fire in **every** project.
 Several of them are wired to one project: the rules injector reads one fixed `RULES.md`, the
@@ -10,7 +10,7 @@ watchdog hooks read one fixed `runs` folder, and the guards match TownReporter c
 and port 5433 by name. This kit keeps the same behavior but moves every project-specific value
 into a small config file, so a hook is active only where a project asks for it.
 
-Read `reference/` for the six original hooks this was ported from. They are the spec.
+Read `reference/` for the originals this was ported from: the six TownReporter hooks, `audit-citation-gate.ps1`, and AntiStallClaude's `antistall-gate.py` + `antistall.py`. They are the spec.
 
 ## How a hook finds its project
 
@@ -36,6 +36,8 @@ So the kit is off everywhere by default. Nothing runs until a project opts in.
 | `hooks/no-idle.mjs` | Stop | Won't let a turn end with finished-but-unhandled workers, a stalled worker, or a running worker and no waiter. |
 | `hooks/double-check.mjs` | Stop | Blocks the first stop of every turn with a check-it-twice list; the second stop goes through, so it never loops. |
 | `hooks/measure-gate.mjs` | Stop | Won't let a turn end while the newest code file is newer than the newest measurement receipt. Gives up after `maxBlocks`, with a note. |
+| `hooks/citation-gate.mjs` | Stop | An audit, review or handoff document written this session may not end the turn until every `VERIFIED: claim \| path:line` names a real file, a real line, and a file the transcript shows a tool call actually read. `UNVERIFIED:` is always accepted. |
+| `hooks/sprint-gate.mjs` | Stop (+ CLI) | While a sprint is armed, the agent cannot end the turn; only a human with the release passphrase can disarm. Pauses (never disarms) at a block cap. |
 | `hooks/wake.mjs` | Stop (asyncRewake) | Sleeps, then exits 2 so Claude wakes up with a worker status report. |
 
 ## Config keys
@@ -187,6 +189,56 @@ done while code is newer than the newest measurement receipt.
   The turn is identified by the last real user message in the transcript.
 - `measureCommand` - shown in the message so the agent knows what to run.
 - `label`, `hookName` - the project's own words in the block message.
+
+### `citation-gate`
+
+Port of `~/.claude/hooks/audit-citation-gate.ps1` (Aug 27, 2026). Scott, Oct 17: "the '7 of 28'
+failure, solved in August and never registered."
+
+```json
+"citation-gate": {
+  "docPattern": "audit|verdict|review|handoff|evidence|assessment|findings",
+  "label": "mysite"
+}
+```
+
+- Governed documents are `.md` files this session wrote (Write/Edit/NotebookEdit in the transcript)
+  whose name matches `docPattern`. Anything under a `memory/` folder is skipped (`excludePattern`).
+- Each governed document must have a `## Verification ledger` heading (`ledgerHeading`). Each
+  `VERIFIED: <claim> | <path>:<line>` row must name a file that exists, a line inside it, and a path
+  some tool call in the transcript read. Otherwise the row must be `UNVERIFIED: <claim> - not checked`.
+- A document that states a verdict (PASS, FAIL, APPROVE, VERDICT, "I recommend") with an empty
+  ledger blocks. Fenced code blocks are stripped before checking, so a format example is not a claim.
+- Fails open only when there is no transcript. Never for a failed citation.
+- If the original PowerShell hook is still registered globally in `settings.json`, this per-project
+  hook duplicates it; register one or the other.
+
+### `sprint-gate`
+
+Port of `scottconverse/AntiStallClaude` v0.3.2. The agent can arm a sprint and can never disarm it.
+
+```json
+"sprint-gate": {
+  "gateDir": ".claude/sprint",
+  "cap": 25,
+  "label": "mysite"
+}
+```
+
+- Hook: while `<gateDir>/gate-<session>.json` (or an unowned `gate.json`) is armed, every Stop is
+  blocked with a "keep working" message. A per-session counter climbs; at `cap` the hook **pauses**
+  (allows that one stop, toasts the human, resets the counter) and the gate stays armed. A corrupt
+  or unreadable counter also pauses. Nothing here ever clears the gate.
+- `honorStopHookActive` (default false): the original ignores `stop_hook_active` on purpose; the cap
+  is the only brake. Set true to let a continuation through.
+- CLI, from the project folder (`node ~/.claude/hook-kit/hooks/sprint-gate.mjs <command>`):
+  `set-release-secret` (human, once; PBKDF2-SHA256, 240k iterations, user-level file),
+  `arm "<goal>"` (refused until a secret exists), `status`, `request "<why>"` (notifies, does not
+  disarm), `release [--all]` (masked Windows password box; the agent can open it, not fill it).
+  `done`, `disarm`, `off` do not exist and exit 7.
+- `secretFile` default: `~/.claude/antistall-release.hash` if it exists (the original's file, same
+  record format), else `~/.claude/sprint-release.hash`. `SPRINT_RELEASE` / `ANTISTALL_RELEASE` env
+  bypasses the dialog for non-interactive human use.
 
 ### `no-idle`
 
@@ -358,7 +410,7 @@ example to read and adapt, not something the installer copies by default.
 node --test "tests/**/*.test.mjs"
 ```
 
-94 tests. Each ported hook has a parity suite that runs the reference hook and the kit hook on the
+109 tests. Each ported hook has a parity suite that runs the reference hook and the kit hook on the
 same input and compares the exit code and the message, using temp folders for the gate files,
 walk reports, findings list and runs folders. There are also scope tests: with no config every
 hook exits 0 and says nothing, `"enabled": false` switches the kit off, a missing section

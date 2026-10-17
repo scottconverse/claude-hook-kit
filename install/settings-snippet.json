@@ -74,6 +74,16 @@
           },
           {
             "type": "command",
+            "command": "node \"<HOOK_KIT_DIR>/hooks/citation-gate.mjs\"",
+            "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "node \"<HOOK_KIT_DIR>/hooks/sprint-gate.mjs\"",
+            "timeout": 15
+          },
+          {
+            "type": "command",
             "command": "node \"<HOOK_KIT_DIR>/hooks/wake.mjs\"",
             "timeout": 1800,
             "asyncRewake": true

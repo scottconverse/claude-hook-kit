@@ -65,7 +65,7 @@ test("install: a fresh install creates settings with the kit hooks and copies th
     assert.ok(fs.existsSync(settingsFile), "settings.json was created");
     const settings = read(settingsFile);
     const cmds = commands(settings.hooks);
-    assert.equal(cmds.length, 10, "ten entries: inject-rules twice + the eight other hooks");
+    assert.equal(cmds.length, 12, "twelve entries: inject-rules twice + the ten other hooks");
     for (const c of cmds) assert.ok(c.includes("/hook-kit/hooks/"), "commands point at the installed copy: " + c);
     // The copied files really exist.
     for (const f of ["hooks/inject-rules.mjs", "hooks/wake.mjs", "lib/config.mjs", "lib/hook-entries.mjs"]) {
@@ -112,7 +112,7 @@ test("install: running twice does not add duplicates", async () => {
     assert.equal(r2.code, 0, r2.stderr);
     const second = commands(read(settingsFile).hooks);
     assert.deepEqual(second, first, "the second install changed nothing");
-    assert.equal(second.length, 10, "still exactly ten entries");
+    assert.equal(second.length, 12, "still exactly twelve entries");
   } finally {
     rimraf(dir);
   }
@@ -263,7 +263,7 @@ test("snippet: the committed snippet matches the shared source", async () => {
     const snippet = read(path.join(REPO, "install", "settings-snippet.json"));
     assert.ok(commands(snippet.hooks).every((c) => c.includes("<HOOK_KIT_DIR>")), "the snippet uses the placeholder, not a real path");
     assert.ok(!JSON.stringify(snippet).includes("C:/Users/scott"), "the snippet names no machine-specific path");
-    assert.equal(commands(snippet.hooks).length, 10, "ten entries in the snippet");
+    assert.equal(commands(snippet.hooks).length, 12, "twelve entries in the snippet");
   } finally {
     rimraf(dir);
   }

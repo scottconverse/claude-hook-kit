@@ -26,6 +26,11 @@
     "label": "my project"
   },
 
+  "sprint-gate": {
+    "cap": 25,
+    "label": "my project"
+  },
+
   "double-check": {
     "quote": "Owner: \"Check everything twice, read everything, do not skim, check the code.\"",
     "label": "my project"

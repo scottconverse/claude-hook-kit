@@ -2,18 +2,18 @@
 
 This manual is for a developer who uses Claude Code and has not seen this kit before. It
 covers what the kit does, how to install it, how to turn on a hook in a project, what each of
-the nine hooks checks, and how to roll back.
+the eleven hooks checks, and how to roll back.
 
 Contents: [What the kit is](#1-what-the-kit-is) · [Requirements](#2-requirements) ·
 [Install](#3-install) · [Quick start](#4-quick-start-turn-on-double-check) ·
-[How a hook finds its config](#5-how-a-hook-finds-its-config) · [The nine hooks](#6-the-nine-hooks) ·
+[How a hook finds its config](#5-how-a-hook-finds-its-config) · [The eleven hooks](#6-the-eleven-hooks) ·
 [Exit codes](#7-exit-codes) · [Uninstall and roll back](#8-uninstall-and-roll-back) ·
 [Testing](#9-testing) · [Troubleshooting](#10-troubleshooting) ·
 [Config key reference](#11-config-key-reference)
 
 ## 1. What the kit is
 
-The kit is nine hook scripts for Claude Code, plus an installer and a per-project config file.
+The kit is eleven hook scripts for Claude Code, plus an installer and a per-project config file.
 The hooks block a few common mistakes: a deploy with no gate, a write to a live database, a walk
 brief that skips a required step, a turn that ends too early, code written before the upstream code
 was read, and a turn that ends "done" with no fresh measurement. The kit is off everywhere until
@@ -43,7 +43,7 @@ The installer does four things:
 2. Backs up `settings.json` to `settings.json.bak-hookkit-<yyyyMMdd-HHmmss>` beside it, if the
    file exists. If that name is taken, it adds `-2`, `-3` and so on, so a backup is never
    overwritten. It prints the path it used.
-3. Merges the kit's nine hook entries into `settings.json`, creating the file if it is missing.
+3. Merges the kit's eleven hook entries into `settings.json`, creating the file if it is missing.
    Every other hook and every other setting in the file stays as it was.
 4. Prints what it changed.
 
@@ -133,7 +133,7 @@ This walk-through turns on one hook, `double-check`, in one project.
 - A regex string that does not compile turns off the check it belongs to. The hook gives no
   message.
 
-## 6. The nine hooks
+## 6. The eleven hooks
 
 | Hook | Event | Matcher | Timeout | What it can do |
 |---|---|---|---|---|
@@ -145,6 +145,8 @@ This walk-through turns on one hook, `double-check`, in one project.
 | `no-idle` | `Stop` | none | 30 | Blocks the end of a turn while workers are unattended. |
 | `double-check` | `Stop` | none | 10 | Blocks the end of a turn once, so Claude checks its work. |
 | `measure-gate` | `Stop` | none | 30 | Blocks the end of a turn while code is newer than the newest receipt. |
+| `citation-gate` | `Stop` | none | 30 | Blocks the end of a turn while an audit/review/handoff document cites files the session never read. |
+| `sprint-gate` | `Stop` | none | 15 | Blocks the end of a turn while a sprint is armed; only a human passphrase disarms. |
 | `wake` | `Stop` (`asyncRewake: true`) | none | 1800 | After a delay, wakes Claude with worker status. |
 
 The events, matchers and timeouts come from `lib/hook-entries.mjs`. The matcher is the list of
@@ -607,6 +609,65 @@ Config keys:
 }
 ```
 
+### 6.10 citation-gate
+
+An audit, review or handoff document may not claim what the session never read. Port of
+`audit-citation-gate.ps1` (Aug 27, 2026), kept in `reference/`.
+
+- Events: `Stop`. Matcher: none. Timeout: 30.
+- The hook reads the session transcript (`transcript_path`), collects every tool call's input, and
+  the files that `Write`, `Edit` or `NotebookEdit` touched. A `.md` among them whose name matches
+  `docPattern` and whose path does not match `excludePattern` is governed.
+- For each governed document, fenced code is removed, then: a `## <ledgerHeading>` heading must
+  exist; if the text states a verdict and the ledger has no `VERIFIED:`/`UNVERIFIED:` rows, block;
+  each `VERIFIED: <claim> | <path>:<line>` must resolve to a real file (as given, or relative to the
+  event's `cwd`), the line must be within the file, and the file's path (or its last two segments)
+  must appear in some tool call input. Each failure is one line in the block message.
+- No transcript, or no governed document: exit 0.
+
+Config keys:
+
+- `docPattern`: regex. Default: `audit|verdict|review|handoff|evidence|assessment|findings` (case-insensitive, on the file name).
+- `excludePattern`: regex. Default: a `memory/` folder anywhere in the path.
+- `ledgerHeading`: text. Default: `Verification ledger`.
+- `label`: text. Default: the project folder name. `skillName`: text.
+
+```json
+"citation-gate": { "label": "my project" }
+```
+
+### 6.11 sprint-gate
+
+While a sprint is armed, the agent cannot end the turn, and only a human can disarm. Port of
+AntiStallClaude v0.3.2 (`reference/antistall-gate.py`, `reference/antistall.py`).
+
+- Events: `Stop`. Matcher: none. Timeout: 15.
+- Gate files live in `gateDir`: `gate-<session id>.json` for one session, or `gate.json` for the
+  whole project (honored when it has no `owner` or its owner is this session). A gate is armed when
+  its JSON has `"active": true`.
+- Armed: the hook increments `count-<session id>` and exits 2 with a message that tells the agent to
+  keep working, how to run `release` for the human, and `request` for a human-only decision. At
+  `cap` it pauses: that one stop is allowed, a desktop toast is shown (Windows), the counter is
+  reset, and the gate stays armed. An unreadable or corrupt counter also pauses. `cap: 0` never
+  pauses.
+- The same file is the CLI. `node hooks/sprint-gate.mjs <command>` from the project folder:
+  `set-release-secret`, `arm "<goal>"`, `status`, `request "<why>"`, `release [--all]`. The
+  passphrase is read from `SPRINT_RELEASE` (or `ANTISTALL_RELEASE`), else a masked Windows dialog.
+  The secret is stored as PBKDF2-SHA256 (240,000 iterations, 16-byte salt) in `secretFile`; the
+  record format is the original's, so an existing `antistall-release.hash` works.
+
+Config keys:
+
+- `gateDir`: path. Default: `.claude/sprint`.
+- `cap`: number. Default: `25`.
+- `honorStopHookActive`: boolean. Default: `false`.
+- `secretFile`: path. Default: `~/.claude/antistall-release.hash` if present, else `~/.claude/sprint-release.hash`.
+- `label`: text. Default: the project folder name.
+
+```json
+"sprint-gate": { "cap": 25, "label": "my project" }
+```
+
 ## 7. Exit codes
 
 The kit's hooks use only two exit codes.
@@ -619,7 +680,7 @@ What exit 2 does, by hook type:
 
 - **PreToolUse** (`deploy-gate`, `walk-brief-guard`, `read-ledger-gate`, `db-write-guard`): blocks the tool call. The
   tool does not run, and Claude sees the message.
-- **Stop** (`no-idle`, `double-check`, `measure-gate`): blocks the end of the turn. Claude gets one more pass with
+- **Stop** (`no-idle`, `double-check`, `measure-gate`, `citation-gate`, `sprint-gate`): blocks the end of the turn. Claude gets one more pass with
   the message. `measure-gate` stops blocking after `maxBlocks` in one turn and prints a note instead.
 - **asyncRewake** (`wake`): wakes Claude with the message. The timer runs in the background, so
   Claude is woken only after the delay.
@@ -671,12 +732,13 @@ npm test
 node --test "tests/**/*.test.mjs"
 ```
 
-`npm test` runs the second command. The suite has 94 tests. On Node v24.21.0 on Windows, all 94 pass.
+`npm test` runs the second command. The suite has 109 tests. On Node v24.21.0 on Windows, all 109 pass.
 
 Six hooks have a parity test. It runs the kit hook and the matching script in `reference/` on the
 same input, then compares the exit code and the message. `no-idle` compares only the status words,
 because its hint text comes from config and the reference's is fixed. `double-check`, `read-ledger-gate` and `measure-gate` have no
-reference script, so their own test files check them. The scope tests check the config lookup. The
+reference script, so their own test files check them. `citation-gate` and `sprint-gate` have parity tests
+against `reference/audit-citation-gate.ps1` (needs PowerShell) and `reference/antistall-gate.py` (needs Python). The scope tests check the config lookup. The
 installer tests use temp folders and never touch the real `~/.claude`.
 
 **Windows note.** Do not run `node --test tests/` with a folder name. On Node v24.21.0 on Windows,
@@ -835,6 +897,16 @@ start a line.
 | `measure-gate` | `measureCommand` | text | none | Shown in the block message. |
 | `measure-gate` | `label` | text | project folder name | Name in the block message. |
 | `measure-gate` | `hookName` | text | `measure-gate` | Name in the block message. |
+| `citation-gate` | `docPattern` | regex | built-in (section 6.10) | Governed document names. |
+| `citation-gate` | `excludePattern` | regex | a `memory/` folder | Paths never governed. |
+| `citation-gate` | `ledgerHeading` | text | `Verification ledger` | Required heading. |
+| `citation-gate` | `label` | text | project folder name | Name in the block message. |
+| `citation-gate` | `skillName` | text | none | Prefix on the block message. |
+| `sprint-gate` | `gateDir` | path | `.claude/sprint` | Gate and counter files. |
+| `sprint-gate` | `cap` | number | `25` | Blocks before a pause; 0 = never pause. |
+| `sprint-gate` | `honorStopHookActive` | boolean | `false` | Let a continuation stop through. |
+| `sprint-gate` | `secretFile` | path | see section 6.11 | PBKDF2 record of the release passphrase. |
+| `sprint-gate` | `label` | text | project folder name | Name in messages. |
 | `wake` | `minutes` | number | `20` | Delay before the wake-up. |
 | `wake` | `runsDir` | path | none | Folder of worker folders. |
 | `wake` | `minutesFile` | path | `<runsDir>/.rewake-seconds` | Seconds that replace `minutes`. |

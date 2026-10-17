@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Nine Claude Code hooks, switched on per project. Each hook stays off until a project adds one config file that turns it on.">
+<meta name="description" content="Eleven Claude Code hooks, switched on per project. Each hook stays off until a project adds one config file that turns it on.">
 <title>claude-hook-kit</title>
 <style>
 :root {
@@ -86,17 +86,17 @@ footer { border-top: 1px solid var(--line); margin-top: 60px; color: var(--muted
   <section class="hero">
     <div class="eyebrow">Scott Converse · Claude Code · MIT</div>
     <h1>Rules that hold<br>because a hook enforces them.</h1>
-    <p class="lead">Nine Claude Code hooks, switched on per project. A rule written in a prompt can be skipped. A hook that returns exit 2 cannot. Install once; each hook stays off in every folder until that folder opts in with one config file.</p>
+    <p class="lead">Eleven Claude Code hooks, switched on per project. A rule written in a prompt can be skipped. A hook that returns exit 2 cannot. Install once; each hook stays off in every folder until that folder opts in with one config file.</p>
     <div class="actions">
       <a class="button primary" href="MANUAL.md">Read the manual</a>
       <a class="button" href="https://github.com/scottconverse/claude-hook-kit">Source on GitHub</a>
     </div>
   </section>
 
-  <p class="note"><strong>Verified boundary:</strong> every hook is tested by running it as a child process with a real hook event (94 tests, Node 24 on Windows). A read ledger proves that files exist with the stated line counts, not that the code was understood or reused. A fresh receipt proves freshness, not a true result. <code>measure-gate</code> gives up after a set number of blocks so it can never loop forever.</p>
+  <p class="note"><strong>Verified boundary:</strong> every hook is tested by running it as a child process with a real hook event (109 tests, Node 24 on Windows), and the two ported hooks have parity tests against their originals. A read ledger proves that files exist with the stated line counts, not that the code was understood or reused. A fresh receipt proves freshness, not a true result. <code>measure-gate</code> gives up after a set number of blocks so it can never loop forever.</p>
 
   <section id="hooks">
-    <h2>The nine hooks</h2>
+    <h2>The eleven hooks</h2>
     <p>Each one has one job. The ones labelled <em>before tool use</em> block a tool call. The ones labelled <em>turn end</em> block the end of a turn.</p>
     <div class="grid">
       <article class="card"><span class="tag">CONTEXT</span><h3><code>inject-rules</code></h3><p>Adds your project's rules file to Claude's context at session start and with every prompt. Never blocks.</p></article>
@@ -107,6 +107,8 @@ footer { border-top: 1px solid var(--line); margin-top: 60px; color: var(--muted
       <article class="card"><span class="tag">TURN END</span><h3><code>no-idle</code></h3><p>Blocks the end of a turn while background workers are left unattended.</p></article>
       <article class="card"><span class="tag">TURN END</span><h3><code>double-check</code></h3><p>Blocks the end of a turn once, so Claude re-checks its work against a checklist. The second stop goes through.</p></article>
       <article class="card"><span class="tag">TURN END</span><h3><code>measure-gate</code></h3><p>Blocks the end of a turn while the code is newer than the newest measurement receipt. No "done" without a number.</p></article>
+      <article class="card"><span class="tag">TURN END</span><h3><code>citation-gate</code></h3><p>Blocks the end of a turn while an audit, review or handoff cites a file the session never read. UNVERIFIED is always accepted; silence is not.</p></article>
+      <article class="card"><span class="tag">TURN END</span><h3><code>sprint-gate</code></h3><p>While a sprint is armed the agent cannot end the turn. Only a human with the passphrase can disarm; the cap pauses, never disarms.</p></article>
       <article class="card"><span class="tag">BACKGROUND</span><h3><code>wake</code></h3><p>After a delay, 20 minutes by default, wakes Claude with a status list of its workers.</p></article>
     </div>
   </section>
