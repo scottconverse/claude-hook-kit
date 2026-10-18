@@ -162,6 +162,9 @@ This walk-through turns on one hook, `double-check`, in one project.
   look at the parent folders.
 - If no config is found, every hook exits 0 and prints nothing.
 - `"enabled": false` at the top of the file switches the whole kit off for that tree.
+- A `Stop` or `SubagentStop` event in a background run (`CLAUDE_CODE_SESSION_ATTENDED=0`, set by
+  `claude -p`) finds no section, so every Stop hook exits 0 and prints nothing. Tool events are not
+  affected. A session where the variable is `1` or not set is not affected. Added Oct 18, 2026.
 - A hook with no section in the file is off. A section with `"enabled": false` is off too.
 - Relative paths in the config resolve from the project folder. That is the folder that holds
   the `.claude` folder. Absolute paths are used as written.
@@ -848,7 +851,7 @@ npm test
 node --test "tests/**/*.test.mjs"
 ```
 
-`npm test` runs the second command. The suite has 128 tests. On Node v24.21.0 on Windows, all 128 pass.
+`npm test` runs the second command. The suite has 140 tests. On Node v24.21.0 on Windows, all 140 pass.
 
 Six hooks have a parity test. It runs the kit hook and the matching script in `reference/` on the
 same input, then compares the exit code and the message. `no-idle` compares only the status words,

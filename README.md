@@ -368,6 +368,13 @@ Scott, Oct 14 2026: "Check everything twice, read everything, do not skim, check
 
 **Off, for one hook.** Delete that hook's section, or set `"enabled": false` inside it.
 
+**Background runs skip the Stop hooks.** A `claude -p` run started by a script (a worker, a test
+run) has `CLAUDE_CODE_SESSION_ATTENDED=0`. In that run every `Stop` and `SubagentStop` hook does
+nothing, so a check-it-twice or no-idle hook cannot hold a headless run that has no person to answer
+it. The tool gates (`PreToolUse`, `PostToolUse`) still run. A session where the variable is `1` or
+not set keeps every hook. Added Oct 18, 2026: the Stop hooks blocked a `claude -p` run 9 times, and
+Claude Code ended it with no answer.
+
 **Off everywhere.** Remove the `hooks` block from `~/.claude/settings.json`. With no hook
 registered nothing runs, and `reference/` still holds the originals.
 
@@ -483,7 +490,7 @@ example to read and adapt, not something the installer copies by default.
 node --test "tests/**/*.test.mjs"
 ```
 
-128 tests. Each ported hook has a parity suite that runs the reference hook and the kit hook on the
+140 tests. Each ported hook has a parity suite that runs the reference hook and the kit hook on the
 same input and compares the exit code and the message, using temp folders for the gate files,
 walk reports, findings list and runs folders. There are also scope tests: with no config every
 hook exits 0 and says nothing, `"enabled": false` switches the kit off, a missing section
