@@ -1,2 +1,5 @@
 node_modules/
 *.bak-*
+
+# Per-machine operator config for this folder (the kit itself is configured per project)
+/.claude/
