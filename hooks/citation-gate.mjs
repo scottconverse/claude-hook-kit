@@ -17,7 +17,16 @@
 //   docPattern      regex string on the document's file name (default: audit|verdict|review|handoff|evidence|assessment|findings)
 //   excludePattern  regex string on the document's path; a match is never governed (default: a /memory/ folder)
 //   ledgerHeading   text of the required heading (default "Verification ledger")
+//   scope           "project" (default): only documents inside this project folder are governed;
+//                   "session": every governed-looking document the transcript wrote, anywhere.
+//                   Oct 17, 2026: a days-long session was blocked over notes written in other
+//                   folders on earlier days; correct by the rules, useless in practice.
 //   label, skillName   the project's own words in the block message
+//
+// Events: Stop (the main agent's transcript) and SubagentStop (the subagent's own transcript,
+// agent_transcript_path). A subagent's handoff note never appears in the main transcript, so
+// without the second event it is never checked. UNVERIFIED: that Claude Code treats exit 2 on
+// SubagentStop as a block the way it does on Stop; the docs describe a JSON decision for it.
 import fs from "node:fs";
 import path from "node:path";
 import { block, loadFromStdin, rx } from "../lib/config.mjs";
@@ -31,10 +40,17 @@ const exclRx = rx(s.excludePattern || "(^|[\\\\/])memory[\\\\/]", "i");
 const heading = String(s.ledgerHeading || "Verification ledger");
 const label = String(s.label || path.basename(s.cfg.dir));
 const skill = s.skillName ? String(s.skillName) + ": " : "";
+const scope = String(s.scope || "project");
 if (!docRx) process.exit(0);
 
-const transcript = String(input.transcript_path || "");
+const event = String(input.hook_event_name || "");
+const transcript = String((event === "SubagentStop" && input.agent_transcript_path) || input.transcript_path || "");
 const cwd = String(input.cwd || process.cwd());
+const projectDir = path.resolve(s.cfg.dir);
+const inProject = (f) => {
+  const rel = path.relative(projectDir, path.resolve(cwd, f));
+  return rel === "" || (!rel.startsWith("..") && !path.isAbsolute(rel));
+};
 let lines;
 try {
   lines = fs.readFileSync(transcript, "utf8").split("\n");
@@ -77,13 +93,17 @@ for (const f of written) {
   if (!/\.md$/i.test(name)) continue;
   if (exclRx && exclRx.test(f)) continue;
   if (!docRx.test(name)) continue;
+  if (scope !== "session" && !inProject(f)) continue;
   if (fs.existsSync(f)) governed.push(f);
 }
 if (!governed.length) process.exit(0);
 
-const resolveCited = (p) => {
+// A relative citation resolves against the document's own folder first, then the event cwd,
+// then the project folder. (Oct 17, 2026: `docs/VERIFICATION.md:54` inside repo B's docs/ was
+// resolved against the session's folder A and reported as a missing file.)
+const resolveCited = (p, docDir) => {
   const c = p.trim().replace(/^[`"']+|[`"']+$/g, "");
-  for (const cand of [c, path.resolve(cwd, c)]) {
+  for (const cand of [c, path.resolve(docDir, c), path.resolve(cwd, c), path.resolve(projectDir, c)]) {
     try {
       if (fs.statSync(cand).isFile()) return path.resolve(cand);
     } catch {}
@@ -133,7 +153,7 @@ for (const doc of governed) {
       problems.push(docName + " : VERIFIED entry has no file:line citation -> '" + claim + "' | '" + cite + "'");
       continue;
     }
-    const resolved = resolveCited(cm[1]);
+    const resolved = resolveCited(cm[1], path.dirname(doc));
     if (!resolved) {
       problems.push(docName + " : cited file does not exist -> '" + cite + "' (claim: " + claim + ")");
       continue;

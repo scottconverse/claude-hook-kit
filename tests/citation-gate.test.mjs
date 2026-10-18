@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { execFile, execFileSync } from "node:child_process";
-import { HOOKS, REFERENCE, makeProject, rimraf, runHook, writeText } from "./helpers.mjs";
+import { HOOKS, REFERENCE, makeProject, mkTemp, rimraf, runHook, writeText } from "./helpers.mjs";
 
 const HOOK = path.join(HOOKS, "citation-gate.mjs");
 const REF = path.join(REFERENCE, "audit-citation-gate.ps1");
@@ -128,6 +128,67 @@ test("citation-gate: no transcript or no governed document is allowed (infrastru
     assert.equal(got.code, 0);
   } finally {
     rimraf(p.root);
+  }
+});
+
+// Oct 17, 2026: a days-long session was blocked over handoff notes written in other folders on
+// earlier days. Default scope is the project; "session" restores the old reach.
+test("citation-gate: scope project ignores a governed document outside the project; scope session governs it", async () => {
+  const p = makeProject({ "citation-gate": {} });
+  const elsewhere = mkTemp("hook-kit-elsewhere-");
+  try {
+    const doc = path.join(elsewhere, "old-handoff.md");
+    writeText(doc, "VERDICT: PASS with no ledger\n");
+    const tr = writeText(path.join(p.root, "t.jsonl"), JSON.stringify({ type: "assistant", message: { content: [{ type: "tool_use", id: "w", name: "Write", input: { file_path: doc, content: "x" } }] } }));
+    const ev = JSON.stringify({ hook_event_name: "Stop", cwd: p.root, transcript_path: tr });
+    let got = await runHook(HOOK, ev, { cwd: p.root });
+    assert.equal(got.code, 0, "outside the project: not governed\n" + got.stderr);
+    fs.writeFileSync(p.configFile, JSON.stringify({ "citation-gate": { scope: "session" } }));
+    got = await runHook(HOOK, ev, { cwd: p.root });
+    assert.equal(got.code, 2, "scope session: governed");
+  } finally {
+    rimraf(p.root);
+    rimraf(elsewhere);
+  }
+});
+
+// Oct 17, 2026: `docs/VERIFICATION.md:54` written inside repo B's docs/ was resolved against the
+// session folder and reported as a missing file.
+test("citation-gate: a relative citation resolves against the document's own folder", async () => {
+  const p = makeProject({ "citation-gate": { label: "Demo" } });
+  try {
+    const src = writeText(path.join(p.root, "docs", "VERIFICATION.md"), "l1\nl2\nl3\n");
+    const doc = path.join(p.root, "docs", "handoff-x.md");
+    writeText(doc, "# H\n\n## Verification ledger\nVERIFIED: thing | VERIFICATION.md:2\n");
+    const msgs = [
+      { type: "assistant", message: { content: [{ type: "tool_use", id: "r", name: "Read", input: { file_path: src } }] } },
+      { type: "assistant", message: { content: [{ type: "tool_use", id: "w", name: "Write", input: { file_path: doc, content: "x" } }] } },
+    ];
+    const tr = writeText(path.join(p.root, "t.jsonl"), msgs.map((m) => JSON.stringify(m)).join("\n"));
+    // Event cwd is the project root, where VERIFICATION.md does not exist; it exists beside the doc.
+    const got = await runHook(HOOK, JSON.stringify({ hook_event_name: "Stop", cwd: p.root, transcript_path: tr }), { cwd: p.root });
+    assert.equal(got.code, 0, got.stderr);
+  } finally {
+    rimraf(p.root);
+  }
+});
+
+// A subagent's handoff note never enters the main transcript. On SubagentStop the gate reads the
+// subagent's own transcript (agent_transcript_path).
+test("citation-gate: on SubagentStop it reads agent_transcript_path", async () => {
+  const f = fixture();
+  try {
+    writeText(f.doc, body("VERIFIED: fake thing | never-read.txt:1\n"));
+    const main = writeText(path.join(f.root, "main.jsonl"), JSON.stringify({ type: "user", message: { content: [{ type: "text", text: "hi" }] } }));
+    const ev = JSON.stringify({ hook_event_name: "SubagentStop", cwd: f.root, session_id: "s", transcript_path: main, agent_transcript_path: path.join(f.root, "t.jsonl"), agent_id: "a1" });
+    const got = await runHook(HOOK, ev, { cwd: f.root });
+    assert.equal(got.code, 2, got.stderr);
+    assert.match(got.stderr, /never-read\.txt:1' but this session's transcript contains no tool call/);
+    // The same event on Stop sees only the main transcript, which wrote nothing: allowed.
+    const onStop = JSON.stringify({ hook_event_name: "Stop", cwd: f.root, session_id: "s", transcript_path: main });
+    assert.equal((await runHook(HOOK, onStop, { cwd: f.root })).code, 0);
+  } finally {
+    rimraf(f.root);
   }
 });
 

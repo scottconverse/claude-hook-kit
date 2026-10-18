@@ -112,6 +112,17 @@
           }
         ]
       }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"<HOOK_KIT_DIR>/hooks/citation-gate.mjs\"",
+            "timeout": 30
+          }
+        ]
+      }
     ]
   }
 }

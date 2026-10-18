@@ -110,6 +110,7 @@ for (const c of CASES) {
       assert.equal(got.code, 2, "a wake always exits 2");
       assert.deepEqual(verdicts(got.stderr), verdicts(want.stderr), "same per-worker verdicts as the reference");
       assert.ok(got.stderr.includes("TownReporter"), "the message names the project");
+      assert.ok(got.stderr.includes('"wake": { "enabled": false }'), "the message says how to silence only this hook");
       for (const w of c.words) assert.ok(got.stderr.includes(w), "stderr mentions " + w);
     } finally {
       rimraf(f.dir);

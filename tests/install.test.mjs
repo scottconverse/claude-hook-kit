@@ -65,10 +65,10 @@ test("install: a fresh install creates settings with the kit hooks and copies th
     assert.ok(fs.existsSync(settingsFile), "settings.json was created");
     const settings = read(settingsFile);
     const cmds = commands(settings.hooks);
-    assert.equal(cmds.length, 15, "fifteen entries: inject-rules and ran-before-done twice each + the eleven other hooks");
+    assert.equal(cmds.length, 16, "sixteen entries: inject-rules, ran-before-done and citation-gate twice each + the ten other hooks");
     for (const c of cmds) assert.ok(c.includes("/hook-kit/hooks/"), "commands point at the installed copy: " + c);
     // The copied files really exist.
-    for (const f of ["hooks/inject-rules.mjs", "hooks/wake.mjs", "lib/config.mjs", "lib/hook-entries.mjs"]) {
+    for (const f of ["hooks/inject-rules.mjs", "hooks/wake.mjs", "lib/config.mjs", "lib/hook-entries.mjs", "doctor.mjs"]) {
       assert.ok(fs.existsSync(path.join(dir, "hook-kit", f)), "copied " + f);
     }
     // Events, matchers, timeouts and asyncRewake match the shipped snippet shape.
@@ -112,7 +112,7 @@ test("install: running twice does not add duplicates", async () => {
     assert.equal(r2.code, 0, r2.stderr);
     const second = commands(read(settingsFile).hooks);
     assert.deepEqual(second, first, "the second install changed nothing");
-    assert.equal(second.length, 15, "still exactly fifteen entries");
+    assert.equal(second.length, 16, "still exactly sixteen entries");
   } finally {
     rimraf(dir);
   }
@@ -263,7 +263,7 @@ test("snippet: the committed snippet matches the shared source", async () => {
     const snippet = read(path.join(REPO, "install", "settings-snippet.json"));
     assert.ok(commands(snippet.hooks).every((c) => c.includes("<HOOK_KIT_DIR>")), "the snippet uses the placeholder, not a real path");
     assert.ok(!JSON.stringify(snippet).includes("C:/Users/scott"), "the snippet names no machine-specific path");
-    assert.equal(commands(snippet.hooks).length, 15, "fifteen entries in the snippet");
+    assert.equal(commands(snippet.hooks).length, 16, "sixteen entries in the snippet");
   } finally {
     rimraf(dir);
   }

@@ -116,6 +116,26 @@ test("doctor: --project validates the project config: absent, typo section, miss
   }
 });
 
+// Oct 15-17, 2026: one line in settings.json silently turned every hook off for two days.
+test("doctor: disableAllHooks true is a loud settings FAIL even when every other row passes", async () => {
+  const i = installed();
+  try {
+    const s = JSON.parse(fs.readFileSync(i.settings, "utf8"));
+    s.disableAllHooks = true;
+    writeJson(i.settings, s);
+    const got = await run(["--config-dir", i.cfg]);
+    const out = JSON.parse(got.stdout);
+    assert.equal(got.code, 1);
+    const row = byCheck(out.rows, "settings").find((r) => r.status === "FAIL");
+    assert.ok(row, JSON.stringify(byCheck(out.rows, "settings")));
+    assert.match(row.detail, /NO hook runs in ANY session/);
+    assert.match(row.detail, /"enabled": false/);
+    assert.ok(byCheck(out.rows, "registered").every((r) => r.status === "PASS"), "registration rows still pass; the flag is the only problem");
+  } finally {
+    rimraf(i.cfg);
+  }
+});
+
 test("doctor: the plain-text report lists one line per row and a summary line", async () => {
   const i = installed();
   try {

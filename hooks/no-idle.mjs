@@ -127,5 +127,8 @@ if (running.length && waiterKnown && !waiterAlive) {
 if (!problems.length) process.exit(0);
 
 const name = String(section.hookName || "no-idle");
-process.stderr.write("BLOCKED by the no-idle hook (" + name + "): " + header + "\n- " + problems.join("\n- ") + "\n");
+process.stderr.write(
+  "BLOCKED by the no-idle hook (" + name + "): " + header + "\n- " + problems.join("\n- ") + "\n" +
+    'To turn off only this hook for this project: set "no-idle": { "enabled": false } in ' + section.cfg.file + ". Do not use disableAllHooks; that turns off every gate on the machine.\n",
+);
 process.exit(2);

@@ -157,6 +157,7 @@ for (const c of CASES) {
       assert.equal(got.code, c.blocked ? 2 : 0);
       assert.deepEqual(verdict(got.stderr), verdict(want.stderr), "same verdict words as the reference");
       if (c.words) for (const w of c.words) assert.ok(got.stderr.includes(w), "stderr mentions " + w);
+      if (c.blocked) assert.ok(got.stderr.includes('"no-idle": { "enabled": false }'), "the block says how to silence only this hook");
     } finally {
       rimraf(f.dir);
       rimraf(f.proj.root);

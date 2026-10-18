@@ -107,6 +107,9 @@ const zoneName = String(s.timeZoneName || "Mountain");
 console.error(
   minutes + "-MINUTE WAKE-UP (" + t + " " + zoneName + ", hook " + hookName + ", project " + label + "). Check now.\n" +
     (lines.length ? lines.join("\n") : "No unhandled workers.") +
-    "\n" + String(s.footer || "Check every worker and server; start the next step for anything finished; relaunch anything stalled."),
+    "\n" + String(s.footer || "Check every worker and server; start the next step for anything finished; relaunch anything stalled.") +
+    // Oct 15 and 17, 2026: the owner killed every hook on the machine (disableAllHooks) to stop
+    // this one. Tell the reader the switch that turns off only this hook, in this project.
+    '\nTo stop only this wake-up for this project: set "wake": { "enabled": false } in ' + s.cfg.file + ". Do not use disableAllHooks; that turns off every gate on the machine.",
 );
 process.exit(2);

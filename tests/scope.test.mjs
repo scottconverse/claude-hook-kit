@@ -132,6 +132,32 @@ test("scope: the nearest config up the tree wins", async () => {
   }
 });
 
+// Oct 17, 2026: a subagent working on project B from a session sitting in project A was judged by
+// A's config, which had no read-ledger-gate section, so B's gate never fired on B's files.
+test("scope: a Write or Edit is judged by the config nearest the file it writes, not the session cwd", async () => {
+  const a = makeProject({ "inject-rules": {} }); // A: no read-ledger-gate
+  const b = makeProject({ "read-ledger-gate": { minEntries: 1 } }); // B: gate on, ledger empty
+  try {
+    const target = path.join(b.root, "src", "app.ts");
+    const ev = (tool) => JSON.stringify({ hook_event_name: "PreToolUse", tool_name: tool, cwd: a.cwd, tool_input: { file_path: target, content: "x", old_string: "a", new_string: "b" } });
+    const hook = path.join(HOOKS, "read-ledger-gate.mjs");
+    for (const tool of ["Write", "Edit"]) {
+      const got = await runHook(hook, ev(tool), { cwd: a.cwd });
+      assert.equal(got.code, 2, tool + " into B from A's cwd must hit B's gate\n" + got.stderr);
+      assert.match(got.stderr, /read-ledger-gate \(/);
+    }
+    // The reverse: a Write into A from B's cwd is judged by A, which has no gate.
+    const back = JSON.stringify({ hook_event_name: "PreToolUse", tool_name: "Write", cwd: b.cwd, tool_input: { file_path: path.join(a.root, "src", "app.ts"), content: "x" } });
+    assert.equal((await runHook(hook, back, { cwd: b.cwd })).code, 0);
+    // A shell command has no target path: still judged by cwd.
+    const sh = JSON.stringify({ hook_event_name: "PreToolUse", tool_name: "Bash", cwd: b.cwd, tool_input: { command: "echo x > src/app.ts" } });
+    assert.equal((await runHook(hook, sh, { cwd: b.cwd })).code, 2);
+  } finally {
+    rimraf(a.root);
+    rimraf(b.root);
+  }
+});
+
 test("scope: cwd comes from the hook event, not the process", async () => {
   // Run the hook from an unrelated folder but pass a cwd that has a config.
   const proj = makeProject({ "inject-rules": { rulesFile: writeText(path.join(os.tmpdir(), "hook-kit-cwd-rules.md"), "FROM CWD\n"), heading: "H:" } });

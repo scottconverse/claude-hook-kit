@@ -112,6 +112,47 @@ test("read-ledger-gate: docs, config, the ledger itself and non-write shell comm
   }
 });
 
+// Oct 17, 2026: the old rule took every code-looking token in a shell command as a write target,
+// so `node doctor.mjs` and a quoted path in an issue body were blocked. Only write destinations count.
+test("read-ledger-gate: running, reading or naming a code file in a shell command is not a write; its destinations are", async () => {
+  const p = project();
+  try {
+    const free = [
+      "node C:/kit/doctor.mjs --project .",
+      "python scripts/check.py --fix",
+      "powershell -NoProfile -File tests/Test-Thing.ps1",
+      "bash scripts/run.sh > out.log",
+      "cat src/app.ts >> notes.txt",
+      "gh issue create --body \"blocked on node x.mjs and y.py\" > /dev/null",
+      "cp src/app.ts /tmp/backup.txt",
+      "sed -n 1,5p src/app.ts",
+      "git diff --cached -- src/app.ts | tee review.txt",
+    ];
+    for (const c of free) {
+      const got = await runHook(HOOK, bash(p.cwd, c), { cwd: p.cwd });
+      assert.equal(got.code, 0, c + "\n" + got.stderr);
+    }
+    const gated = [
+      "echo x > src/app.ts",
+      "cat <<'EOF' > src/app.ts\nx\nEOF",
+      "node gen.mjs | tee src/out.ts",
+      "cp /tmp/x.ts src/app.ts",
+      "mv a.ts src/b.ts",
+      "echo x | Set-Content -Path src/app.ps1",
+      "Get-Content a.txt | Out-File src/x.py",
+      "sed -i 's/a/b/' src/app.ts",
+      "git checkout -- src/app.ts",
+      "python - <<'PY' > src/app.mjs\nprint(1)\nPY",
+    ];
+    for (const c of gated) {
+      const got = await runHook(HOOK, bash(p.cwd, c), { cwd: p.cwd });
+      assert.equal(got.code, 2, "should block: " + c);
+    }
+  } finally {
+    rimraf(p.root);
+  }
+});
+
 test("read-ledger-gate: off when its section is missing or enabled is false", async () => {
   for (const config of [{ "inject-rules": {} }, { "read-ledger-gate": { enabled: false } }, { enabled: false, "read-ledger-gate": {} }]) {
     const p = makeProject(config);

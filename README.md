@@ -38,7 +38,7 @@ So the kit is off everywhere by default. Nothing runs until a project opts in.
 | `hooks/no-idle.mjs` | Stop | Won't let a turn end with finished-but-unhandled workers, a stalled worker, or a running worker and no waiter. |
 | `hooks/double-check.mjs` | Stop | Blocks the first stop of every turn with a check-it-twice list; the second stop goes through, so it never loops. |
 | `hooks/measure-gate.mjs` | Stop | Won't let a turn end while the newest code file is newer than the newest measurement receipt. Gives up after `maxBlocks`, with a note. |
-| `hooks/citation-gate.mjs` | Stop | An audit, review or handoff document written this session may not end the turn until every `VERIFIED: claim \| path:line` names a real file, a real line, and a file the transcript shows a tool call actually read. `UNVERIFIED:` is always accepted. |
+| `hooks/citation-gate.mjs` | Stop, SubagentStop | An audit, review or handoff document written this session may not end the turn until every `VERIFIED: claim \| path:line` names a real file, a real line, and a file the transcript shows a tool call actually read. `UNVERIFIED:` is always accepted. |
 | `hooks/sprint-gate.mjs` | Stop (+ CLI) | While a sprint is armed, the agent cannot end the turn; only a human with the release passphrase can disarm. Pauses (never disarms) at a block cap. |
 | `hooks/wake.mjs` | Stop (asyncRewake) | Sleeps, then exits 2 so Claude wakes up with a worker status report. |
 
@@ -205,10 +205,13 @@ failure, solved in August and never registered."
 ```
 
 - Governed documents are `.md` files this session wrote (Write/Edit/NotebookEdit in the transcript)
-  whose name matches `docPattern`. Anything under a `memory/` folder is skipped (`excludePattern`).
+  whose name matches `docPattern` and which sit under the project folder (`scope: "project"`, the
+  default; `"session"` reaches every folder). Anything under a `memory/` folder is skipped
+  (`excludePattern`). On `SubagentStop` the subagent's own transcript is read.
 - Each governed document must have a `## Verification ledger` heading (`ledgerHeading`). Each
-  `VERIFIED: <claim> | <path>:<line>` row must name a file that exists, a line inside it, and a path
-  some tool call in the transcript read. Otherwise the row must be `UNVERIFIED: <claim> - not checked`.
+  `VERIFIED: <claim> | <path>:<line>` row must name a file that exists (as written, or relative to the
+  document's folder, the cwd, or the project), a line inside it, and a path some tool call in the
+  transcript read. Otherwise the row must be `UNVERIFIED: <claim> - not checked`.
 - A document that states a verdict (PASS, FAIL, APPROVE, VERDICT, "I recommend") with an empty
   ledger blocks. Fenced code blocks are stripped before checking, so a format example is not a claim.
 - Fails open only when there is no transcript. Never for a failed citation.
@@ -417,9 +420,12 @@ you pass `--force`.
 ```
 node doctor.mjs
 node doctor.mjs --project <folder>
+node ~/.claude/hook-kit/doctor.mjs --project .   # installed copy, no repo needed
 ```
 
-Port of fleet-smoke's hook-liveness check. Read-only. It parses `settings.json`, checks that every registered
+Port of fleet-smoke's hook-liveness check. Read-only. It fails loudly on `"disableAllHooks": true`, the one
+settings line that switches off every hook on the machine (it was on for two days in Oct 2026 before anyone
+noticed; the fix for one noisy hook is `"<hook>": { "enabled": false }` in that project's config). It parses `settings.json`, checks that every registered
 hook command (kit or not) points at a file that exists, that every kit hook is registered under its event,
 and runs each installed kit hook once with a no-config event in an empty temp folder, expecting exit 0 and
 silence. With `--project` it also parses that folder's `.claude/hook-kit.json`, names sections that match no

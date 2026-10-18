@@ -36,6 +36,10 @@ let settings = null;
 try {
   settings = JSON.parse(fs.readFileSync(settingsPath, "utf8").replace(/^﻿/, ""));
   add("settings", "PASS", settingsPath + " parses");
+  // Oct 15-17, 2026: this one line silently turned every gate off for two days. Say it loudly.
+  if (settings.disableAllHooks === true) {
+    add("settings", "FAIL", settingsPath + ': "disableAllHooks": true. NO hook runs in ANY session on this machine; every gate below is off no matter what the rows say. Remove the line or set it to false. To silence one hook in one project, set "<hook>": { "enabled": false } in that project\'s .claude/hook-kit.json instead.');
+  }
 } catch (e) {
   add("settings", "FAIL", settingsPath + ": " + (e.code === "ENOENT" ? "missing" : e.message));
 }

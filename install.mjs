@@ -61,6 +61,13 @@ function copyKit(dest) {
       written.push(path.join(sub, name).split(path.sep).join("/"));
     }
   }
+  // The doctor imports ./lib/hook-entries.mjs, so it lives beside lib/ in the installed copy:
+  // `node <settings folder>/hook-kit/doctor.mjs` works without the repo clone.
+  const doctor = path.join(REPO, "doctor.mjs");
+  if (fs.existsSync(doctor)) {
+    fs.copyFileSync(doctor, path.join(dest, "doctor.mjs"));
+    written.push("doctor.mjs");
+  }
   return written;
 }
 

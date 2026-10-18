@@ -43,7 +43,8 @@ The installer does four things:
 2. Backs up `settings.json` to `settings.json.bak-hookkit-<yyyyMMdd-HHmmss>` beside it, if the
    file exists. If that name is taken, it adds `-2`, `-3` and so on, so a backup is never
    overwritten. It prints the path it used.
-3. Merges the kit's fifteen hook entries (thirteen hooks; `inject-rules` and `ran-before-done` each have two events) into `settings.json`, creating the file if it is missing.
+3. Merges the kit's sixteen hook entries (thirteen hooks; `inject-rules`, `ran-before-done` and `citation-gate` each have two events) into `settings.json`, creating the file if it is missing.
+4. Copies `doctor.mjs` next to the hooks, so `node ~/.claude/hook-kit/doctor.mjs` works from any folder without the repo.
    Every other hook and every other setting in the file stays as it was.
 4. Prints what it changed.
 
@@ -76,12 +77,17 @@ node install.mjs --config-dir "D:/claude-config"
 node doctor.mjs
 node doctor.mjs --project <folder>
 node doctor.mjs --json
+node ~/.claude/hook-kit/doctor.mjs --project .     # the installed copy, from any project
 ```
 
 `doctor.mjs` is read-only. It is a port of the hook-liveness check from `scottconverse/fleet-smoke`
 (`reference/fleet-smoke-hook_liveness.py`), extended with what the kit knows about itself. Rows:
 
-- `settings`: `<settings folder>/settings.json` exists and parses.
+- `settings`: `<settings folder>/settings.json` exists and parses. `"disableAllHooks": true` in that file is a
+  `FAIL`: with it set, no hook runs in any session on the machine, including every kit hook, and nothing else
+  in the file matters. (Oct 15-17, 2026: that one line was on for two days before anyone noticed.) To silence
+  one hook in one project, set `"<hook>": { "enabled": false }` in that project's `.claude/hook-kit.json`
+  instead.
 - `script`: every registered hook command, kit or not, names a script file that exists. A command whose
   script path cannot be recognized is `PARTIAL`.
 - `registered`: every kit hook is registered under every event `lib/hook-entries.mjs` says it needs.
@@ -145,6 +151,11 @@ This walk-through turns on one hook, `double-check`, in one project.
 
 - The hook reads `cwd` from the event's input. If the input has no `cwd`, the hook uses the
   folder it was started in. The code notes that it has not verified that every event sends `cwd`.
+- For a `Write`, `Edit`, `MultiEdit` or `NotebookEdit` event the walk starts at the folder of the
+  file being written (`tool_input.file_path` or `notebook_path`, resolved against `cwd`), not at
+  `cwd`. A subagent editing project B from a session sitting in project A is judged by B's config.
+  Added Oct 17, 2026, after exactly that let a gated write through. Shell commands have no single
+  target path and are still judged by `cwd`.
 - The hook walks up from that folder, one parent at a time, looking for
   `.claude/hook-kit.json`. The first file it finds is used. The nearest config wins.
 - If the nearest file is not valid JSON, the kit is off for that folder tree. The hook does not
@@ -555,9 +566,15 @@ No code until the upstream code was read. Added Oct 15, 2026, after three agents
 that step on one project.
 
 - Events: `PreToolUse`. Matcher: `Write|Edit|Bash|PowerShell`. Timeout: 15.
-- A `Write` or `Edit` whose path matches `codePattern` is gated. A shell command is gated when it
-  matches `shellWritePattern` and names a code path. Paths matching `exemptPattern`, and the ledger
-  itself, are never gated.
+- A `Write`, `Edit`, `MultiEdit` or `NotebookEdit` whose path matches `codePattern` is gated. A shell
+  command is gated when it matches `shellWritePattern` and one of its *write destinations* is a code
+  path: the target of `>`, `>>` or `&>`, the file given to `tee`, the destination of `cp`/`mv`/
+  `Copy-Item`/`Move-Item`, the path of `Set-Content`/`Add-Content`/`Out-File`, the files after
+  `sed -i`, and the files named to `git checkout/restore/apply/...`. Running, reading or merely naming
+  a code file (`node x.mjs`, `cat x.py`, a path quoted in an issue body) is not a write. Before
+  Oct 17, 2026 every code-looking token counted and `node doctor.mjs` was blocked. A write hidden
+  inside an interpreter (`python -c "open('x.py','w')"`) is not seen here; `command-gate`'s
+  `blockInlineCode` covers that. Paths matching `exemptPattern`, and the ledger itself, are never gated.
 - The ledger is read line by line. Each line matching `rowPattern` is a row: a path and a line
   count. A relative path is looked up in each of `upstreamRoots`.
 - The hook blocks when: the ledger is missing; a row names a file that does not exist
@@ -640,14 +657,18 @@ Config keys:
 An audit, review or handoff document may not claim what the session never read. Port of
 `audit-citation-gate.ps1` (Aug 27, 2026), kept in `reference/`.
 
-- Events: `Stop`. Matcher: none. Timeout: 30.
-- The hook reads the session transcript (`transcript_path`), collects every tool call's input, and
-  the files that `Write`, `Edit` or `NotebookEdit` touched. A `.md` among them whose name matches
-  `docPattern` and whose path does not match `excludePattern` is governed.
+- Events: `Stop` and `SubagentStop`. Matcher: none. Timeout: 30.
+- The hook reads the transcript: `transcript_path` on `Stop`, `agent_transcript_path` on
+  `SubagentStop` (a subagent's handoff note never enters the main transcript). It collects every
+  tool call's input and the files that `Write`, `Edit` or `NotebookEdit` touched. A `.md` among them
+  whose name matches `docPattern`, whose path does not match `excludePattern`, and (with the default
+  `scope`) which sits under the project folder is governed. UNVERIFIED: that exit 2 on `SubagentStop`
+  blocks the subagent the way it blocks a `Stop`; the Claude Code docs list the event, the behaviour
+  has not been measured here.
 - For each governed document, fenced code is removed, then: a `## <ledgerHeading>` heading must
   exist; if the text states a verdict and the ledger has no `VERIFIED:`/`UNVERIFIED:` rows, block;
   each `VERIFIED: <claim> | <path>:<line>` must resolve to a real file (as given, or relative to the
-  event's `cwd`), the line must be within the file, and the file's path (or its last two segments)
+  document's own folder, then the event's `cwd`, then the project folder), the line must be within the file, and the file's path (or its last two segments)
   must appear in some tool call input. Each failure is one line in the block message.
 - No transcript, or no governed document: exit 0.
 
@@ -655,6 +676,10 @@ Config keys:
 
 - `docPattern`: regex. Default: `audit|verdict|review|handoff|evidence|assessment|findings` (case-insensitive, on the file name).
 - `excludePattern`: regex. Default: a `memory/` folder anywhere in the path.
+- `scope`: `"project"` or `"session"`. Default: `"project"`: only documents under the project folder
+  (the one holding `.claude/hook-kit.json`) are governed. `"session"` governs every document the
+  transcript wrote, anywhere. Added Oct 17, 2026, after a days-long session was blocked over handoff
+  notes written in other folders on earlier days.
 - `ledgerHeading`: text. Default: `Verification ledger`.
 - `label`: text. Default: the project folder name. `skillName`: text.
 
@@ -977,7 +1002,7 @@ start a line.
 | `read-ledger-gate` | `mustMention` | list of text | none | Each word must appear in some row path. |
 | `read-ledger-gate` | `codePattern` | regex | built-in (section 6.8) | Paths that count as code. |
 | `read-ledger-gate` | `exemptPattern` | regex | built-in (section 6.8) | Paths never gated. |
-| `read-ledger-gate` | `shellWritePattern` | regex | built-in (section 6.8) | Shell commands that write files. |
+| `read-ledger-gate` | `shellWritePattern` | regex | built-in (section 6.8) | Shell commands that may write files; only their write destinations are then checked. |
 | `read-ledger-gate` | `rowPattern` | regex | built-in (section 6.8) | A ledger row: path, then count. |
 | `read-ledger-gate` | `label` | text | project folder name | Name in the block message. |
 | `read-ledger-gate` | `skillName` | text | none | Prefix on the block message. |
@@ -996,6 +1021,7 @@ start a line.
 | `measure-gate` | `hookName` | text | `measure-gate` | Name in the block message. |
 | `citation-gate` | `docPattern` | regex | built-in (section 6.10) | Governed document names. |
 | `citation-gate` | `excludePattern` | regex | a `memory/` folder | Paths never governed. |
+| `citation-gate` | `scope` | `project` or `session` | `project` | Govern only documents under the project, or every document the transcript wrote. |
 | `citation-gate` | `ledgerHeading` | text | `Verification ledger` | Required heading. |
 | `citation-gate` | `label` | text | project folder name | Name in the block message. |
 | `citation-gate` | `skillName` | text | none | Prefix on the block message. |
