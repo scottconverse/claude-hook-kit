@@ -135,6 +135,12 @@ const turnKey = (() => {
       if (m?.type !== "user") continue;
       const c = m?.message?.content;
       if (Array.isArray(c) && c.some((x) => x?.type === "tool_result")) continue;
+      // Claude Code delivers a Stop hook's own block message back as a user-type line with
+      // isMeta: true and text beginning "Stop hook feedback:". That is not a new turn. Counting
+      // it as one reset this counter on every block, so maxBlocks never tripped (Oct 17, 2026).
+      if (m?.isMeta === true) continue;
+      const text = typeof c === "string" ? c : Array.isArray(c) ? c.map((x) => (typeof x?.text === "string" ? x.text : "")).join("\n") : "";
+      if (/^\s*Stop hook feedback:/.test(text)) continue;
       return "L" + i;
     }
   } catch {}

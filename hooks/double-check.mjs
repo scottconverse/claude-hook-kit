@@ -46,7 +46,11 @@ if (minTools > 0) {
       const content = m?.message?.content;
       if (m?.type === "user") {
         const isToolResult = Array.isArray(content) && content.some((c) => c?.type === "tool_result");
-        if (!isToolResult) break;
+        // A Stop hook's own block message comes back as a user line with isMeta: true and
+        // text "Stop hook feedback:". It is not the start of a turn.
+        const text = typeof content === "string" ? content : Array.isArray(content) ? content.map((c) => (typeof c?.text === "string" ? c.text : "")).join("\n") : "";
+        const isHookFeedback = m?.isMeta === true || /^\s*Stop hook feedback:/.test(text);
+        if (!isToolResult && !isHookFeedback) break;
       }
       if (m?.type === "assistant" && Array.isArray(content)) count += content.filter((c) => c?.type === "tool_use").length;
     }

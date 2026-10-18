@@ -109,6 +109,39 @@ test("measure-gate: gives up after maxBlocks in the same turn and lets the turn 
   }
 });
 
+// Regression (Oct 17, 2026): Claude Code writes each Stop block back into the transcript as a
+// user-type line with isMeta: true and text "Stop hook feedback: ...". The old turn key treated
+// that line as a new turn, so the counter reset to 1 on every block and the cap never tripped.
+test("measure-gate: hook-feedback lines between blocks do not reset the give-up counter", async () => {
+  const p = project({ maxBlocks: 2 });
+  try {
+    const user = { type: "user", message: { content: [{ type: "text", text: "do it" }] } };
+    const feedback = (n) => ({ type: "user", isMeta: true, message: { role: "user", content: "Stop hook feedback:\n[node measure-gate.mjs]: MEASURE-GATE block " + n } });
+    const tr = writeText(path.join(p.root, "t.jsonl"), JSON.stringify(user) + "\n");
+    const sid = "mg-feedback-" + process.pid;
+    const ev = () => JSON.stringify({ hook_event_name: "Stop", cwd: p.cwd, session_id: sid, transcript_path: tr });
+    const first = await runHook(HOOK, ev(), { cwd: p.cwd });
+    assert.equal(first.code, 2, "block 1");
+    assert.match(first.stderr, /\(1\/2\)/);
+    fs.appendFileSync(tr, JSON.stringify(feedback(1)) + "\n");
+    const second = await runHook(HOOK, ev(), { cwd: p.cwd });
+    assert.equal(second.code, 2, "block 2");
+    assert.match(second.stderr, /\(2\/2\)/, "counter advanced despite the feedback line");
+    fs.appendFileSync(tr, JSON.stringify(feedback(2)) + "\n");
+    const third = await runHook(HOOK, ev(), { cwd: p.cwd });
+    assert.equal(third.code, 0, "gave up");
+    assert.match(third.stdout, /gave up after 2 blocks this turn/);
+    // A feedback line without isMeta but with the text prefix is also not a turn.
+    fs.appendFileSync(tr, JSON.stringify({ type: "user", message: { content: [{ type: "text", text: "Stop hook feedback:\nsomething" }] } }) + "\n");
+    assert.equal((await runHook(HOOK, ev(), { cwd: p.cwd })).code, 0, "still given up");
+    // A real user message resets.
+    fs.appendFileSync(tr, JSON.stringify(user) + "\n");
+    assert.equal((await runHook(HOOK, ev(), { cwd: p.cwd })).code, 2, "new turn blocks again");
+  } finally {
+    rimraf(p.root);
+  }
+});
+
 test("measure-gate: off with no receipt location, no code, a missing section, or enabled false", async () => {
   const cases = [
     { "measure-gate": { label: "no location" } },
